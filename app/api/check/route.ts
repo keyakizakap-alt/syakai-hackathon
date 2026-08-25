@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { analyze, hasCredentials, NoCredentialsError, RefusalError } from "@/lib/analyze";
+import { analyze } from "@/lib/analyze";
+import { hasCredentials, NoCredentialsError, RefusalError } from "@/lib/claude";
 import { demoResult, PRESETS } from "@/lib/demo";
 
 export const runtime = "nodejs";
-/** 4ペルソナ並列判定＋逆翻訳ゲートで時間がかかるため長めに取る */
-export const maxDuration = 120;
+/** 4ペルソナ並列判定＋逆翻訳ゲートで時間がかかるため上限まで取る */
+export const maxDuration = 60;
 
 const MAX_CHARS = 600;
 

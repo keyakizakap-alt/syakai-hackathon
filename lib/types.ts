@@ -101,3 +101,62 @@ export const CULTURES: Record<CultureId, CultureMeta> = {
     accent: "#d67bb0",
   },
 };
+
+// ── 受信フィルタ（入国審査）─────────────────────────────────────
+
+export type WorkLang = "ja" | "en" | "ko" | "zh";
+
+export interface Work {
+  id: string;
+  lang: WorkLang;
+  title: string;
+  /** 作者が実際に付けたタグ。言語圏ごとにタグ文化が違うのが要点 */
+  tags: string[];
+  summary: string;
+  /** 作者が明示的に宣言した警告。日本語圏は「※」形式、英語圏はCW形式 */
+  declaredWarnings: string[];
+}
+
+/** block=遮断 / warn=注意して開く / pass=通す */
+export type FilterDecision = "block" | "warn" | "pass";
+
+export interface TagMapping {
+  /** ユーザーが自然文で書いた要素 */
+  source: string;
+  /** 言語圏ごとの対応タグ。1対1ではなく1対Nの条件付き写像になる */
+  targets: { lang: WorkLang; tag: string; condition: string }[];
+}
+
+export interface WorkVerdict {
+  workId: string;
+  decision: FilterDecision;
+  /** 0-100。低い場合は安全側（遮断寄り）に倒す */
+  confidence: number;
+  reason: string;
+  /** 遮断の根拠になったタグ・記述 */
+  matched: string[];
+  /**
+   * 受信側の言語圏の基準では必要なのに、作者が宣言していない警告。
+   * 「警告の越境失効」そのものを検出する。
+   */
+  missingWarnings: string[];
+}
+
+export interface FilterResult {
+  declaration: string;
+  profile: {
+    /** 自然文から抽出した遮断対象 */
+    elements: string[];
+    mappings: TagMapping[];
+  };
+  verdicts: WorkVerdict[];
+  mode: "live" | "demo";
+  elapsedMs: number;
+}
+
+export const WORK_LANG_LABEL: Record<WorkLang, string> = {
+  ja: "日本語",
+  en: "English",
+  ko: "한국어",
+  zh: "中文",
+};

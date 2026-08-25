@@ -1,6 +1,16 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
+
+import {
+  assertNoRefusal,
+  FALLBACK_BETA,
+  getClient,
+  MODEL,
+  POLARITY_GUARD,
+  sanitizeForPrompt,
+  TONE_RULE,
+} from "./claude";
 
 import { NORM_CARDS } from "./norms";
 import { lookupGlossary, toHit, type GlossaryEntry } from "./glossary";
@@ -13,33 +23,6 @@ import {
   type CultureReading,
   type Verdict,
 } from "./types";
-
-const MODEL = "claude-opus-5";
-/** Claude Opus 5 の refusal に対するサーバーサイド・フォールバック */
-const FALLBACK_BETA = "server-side-fallback-2026-07-01";
-
-export class NoCredentialsError extends Error {
-  constructor() {
-    super("ANTHROPIC_API_KEY が設定されていません");
-    this.name = "NoCredentialsError";
-  }
-}
-
-export class RefusalError extends Error {
-  constructor(category: string | null) {
-    super(`モデルが応答を拒否しました${category ? `（${category}）` : ""}`);
-    this.name = "RefusalError";
-  }
-}
-
-export function hasCredentials(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
-}
-
-function getClient(): Anthropic {
-  if (!hasCredentials()) throw new NoCredentialsError();
-  return new Anthropic();
-}
 
 // ── スキーマ ───────────────────────────────────────────────────
 
@@ -89,15 +72,6 @@ function glossaryBlock(hits: GlossaryEntry[]): string {
     )
     .join("\n");
 }
-
-const TONE_RULE = `
-あなたは検閲官ではなく通訳者である。どの文化を「正しい」とも判定せず、双方の前提の違いだけを述べよ。
-説教・道徳的な指導・書き手を責める表現を使ってはならない。書き手が自分で判断できる材料だけを返す。`.trim();
-
-const POLARITY_GUARD = `
-【極性ガード】「しんどい」「無理」「死ぬ」「やばい」「草」「awsl」「I'm dead」「💀」「泣いた」の類が
-原文にある場合、文脈上ポジティブ（最上級の肯定）である可能性を必ず第一候補として検討せよ。
-これらを疲労・拒絶・自傷・脅迫として読むのは、機械翻訳が最も頻繁に犯す誤りである。`.trim();
 
 function panelSystem(hits: GlossaryEntry[]): string {
   const cards = CULTURE_IDS.map((id) => {
@@ -161,12 +135,6 @@ ${glossaryBlock(hits)}
 
 // ── 呼び出し ───────────────────────────────────────────────────
 
-function assertNoRefusal(res: { stop_reason: string | null; stop_details?: unknown }): void {
-  if (res.stop_reason !== "refusal") return;
-  const details = res.stop_details as { category?: string | null } | null | undefined;
-  throw new RefusalError(details?.category ?? null);
-}
-
 async function runPanel(client: Anthropic, input: string, hits: GlossaryEntry[]): Promise<CultureReading[]> {
   const res = await client.beta.messages.parse({
     model: MODEL,
@@ -175,7 +143,7 @@ async function runPanel(client: Anthropic, input: string, hits: GlossaryEntry[])
     fallbacks: "default",
     thinking: { type: "adaptive" },
     system: panelSystem(hits),
-    messages: [{ role: "user", content: `次の投稿文を判定せよ。\n\n<投稿文>\n${input}\n</投稿文>` }],
+    messages: [{ role: "user", content: `次の投稿文を判定せよ。\n\n<投稿文>\n${sanitizeForPrompt(input)}\n</投稿文>` }],
     output_config: { format: zodOutputFormat(PanelSchema) },
   });
   assertNoRefusal(res);
@@ -212,7 +180,7 @@ async function runGate(client: Anthropic, input: string, hits: GlossaryEntry[]):
     messages: [
       {
         role: "user",
-        content: `次の原文を各言語へ訳し、逆翻訳して採点せよ。\n\n<原文>\n${input}\n</原文>\n\n<対象言語>\n${targets}\n</対象言語>`,
+        content: `次の原文を各言語へ訳し、逆翻訳して採点せよ。\n\n<原文>\n${sanitizeForPrompt(input)}\n</原文>\n\n<対象言語>\n${targets}\n</対象言語>`,
       },
     ],
     output_config: { format: zodOutputFormat(GateSchema) },
@@ -282,9 +250,22 @@ export async function analyze(input: string): Promise<CheckResult> {
   const client = getClient();
   const hits = lookupGlossary(input);
 
-  // ペルソナ判定と逆翻訳ゲートは互いに独立なので並列に走らせる
-  const [rawReadings, gates] = await Promise.all([runPanel(client, input, hits), runGate(client, input, hits)]);
-  const cultures = applyGate(rawReadings, gates);
+  // ペルソナ判定と逆翻訳ゲートは互いに独立なので並列に走らせる。
+  // ゲートだけ落ちた場合にペルソナ判定まで巻き添えで失うのは過剰なので、
+  // allSettled で受けて部分的な結果を返せるようにしている。
+  const [panelRes, gateRes] = await Promise.allSettled([
+    runPanel(client, input, hits),
+    runGate(client, input, hits),
+  ]);
+
+  // ペルソナ判定が落ちた場合だけは返せるものが無いので、そのまま失敗させる
+  if (panelRes.status === "rejected") throw panelRes.reason;
+
+  if (gateRes.status === "rejected") {
+    console.error("[analyze] 逆翻訳ゲートに失敗したため、ペルソナ判定のみで返します", gateRes.reason);
+  }
+  const gates = gateRes.status === "fulfilled" ? gateRes.value : [];
+  const cultures = applyGate(panelRes.value, gates);
 
   return {
     input,
