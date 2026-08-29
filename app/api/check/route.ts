@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { analyze } from "@/lib/analyze";
-import { hasCredentials, NoCredentialsError, RefusalError } from "@/lib/claude";
+import { NoCredentialsError, RefusalError } from "@/lib/claude";
 import { demoResult, PRESETS } from "@/lib/demo";
+import { hasCredentialsFor } from "@/lib/dispatch";
 
 export const runtime = "nodejs";
 /** 4ペルソナ並列判定＋逆翻訳ゲートで時間がかかるため上限まで取る */
@@ -30,9 +31,9 @@ export async function POST(req: Request) {
     );
   }
 
-  // APIキーがない環境ではプリセット例のみデモ応答を返す。
-  // ハッカソン当日にキーが使えない事態への保険も兼ねている。
-  if (!hasCredentials()) {
+  // panel（核となる文化規範判定）が必要とする認証情報が無い環境では
+  // プリセット例のみデモ応答を返す。ハッカソン当日にキーが使えない事態への保険も兼ねている。
+  if (!hasCredentialsFor("panel")) {
     const demo = demoResult(text);
     if (demo) return NextResponse.json(demo);
     return NextResponse.json(

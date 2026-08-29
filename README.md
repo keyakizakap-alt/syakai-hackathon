@@ -98,8 +98,10 @@ app/
   api/check/route.ts   出国審査API（キーの有無で live/demo を切り替え）
   api/filter/route.ts  入国審査API
 lib/
-  claude.ts            クライアント・共通プロンプト制約・入力の無害化
-  models.ts            処理ごとに使うモデルを解決するレジストリ（詳細は下記）
+  claude.ts            Anthropicクライアント・共通プロンプト制約・入力の無害化
+  openrouter.ts        OpenRouter（Gemini/Llama等）クライアント
+  models.ts            処理ごとに使うプロバイダ・モデルを解決するレジストリ（詳細は下記）
+  dispatch.ts          プロバイダ分岐を一箇所に集約する呼び出し口（complete）
   norms.ts             文化規範カード 4文化 × 12項目 ← 中核の知識資産
   glossary.ts          ファンダム語彙集（完全一致・長い語優先でマスクしながら照合）
   analyze.ts           ペルソナ判定と逆翻訳ゲートを並列実行し、ゲートで昇格させる
@@ -119,27 +121,42 @@ components/
 
 ## モデルの切り替え
 
-3つの処理はそれぞれ独立したモデルを使う。**基本モデルは Claude Sonnet 5** で、
-panel と並列/毎回実行される gate・filter は最安ティアの Haiku 4.5 を既定にしている。
+3つの処理はそれぞれ独立したプロバイダ・モデルを使う。**panel（核となる文化規範判定）は
+精度優先で常に Claude**。gate・filter は panel と並列/毎回実行される機械的な処理のため、
+**OpenRouter経由の安価なモデルを既定**にしている。
 
-| 処理 | 内容 | 既定モデル | 環境変数 |
+| 処理 | 内容 | 既定プロバイダ | 既定モデル |
 |---|---|---|---|
-| panel | 4文化ペルソナ判定（プロダクトの核） | `claude-sonnet-5` | `NUANCE_MODEL_PANEL` |
-| gate | 逆翻訳による品質採点（機械的・毎回並列実行） | `claude-haiku-4-5` | `NUANCE_MODEL_GATE` |
-| filter | 受信フィルタのタグ写像 | `claude-haiku-4-5` | `NUANCE_MODEL_FILTER` |
+| panel | 4文化ペルソナ判定（プロダクトの核） | Anthropic | `claude-sonnet-5` |
+| gate | 逆翻訳による品質採点（機械的・毎回並列実行） | OpenRouter | `google/gemini-2.5-flash` |
+| filter | 受信フィルタのタグ写像 | OpenRouter | `google/gemini-2.5-flash` |
 
-料金の目安（Anthropic公式・入力/出力 per 1Mトークン）：Opus 5 = $5/$25、Sonnet 5 = $3/$15、
-Haiku 4.5 = $1/$5。gate・filter を Haiku 4.5 にするだけで、全処理を Opus 5 固定にした場合より
-大きくコストが下がる。判定精度を優先したい場合は `NUANCE_MODEL_PANEL=claude-opus-5` のように
-環境変数で個別に上書きできる。
+[OpenRouter](https://openrouter.ai/)はGemini・Llama・DeepSeekなど多数のモデルを
+**1つのAPIキー・OpenAI互換の1つのAPI形式**で呼び出せるプロキシ。`NUANCE_MODEL_GATE`に
+OpenRouter上の任意のモデルID（例：`meta-llama/llama-3.3-70b-instruct`）を指定するだけで、
+コード変更なしにモデルを切り替えられる。プロバイダ自体をAnthropicに戻したい場合は
+`NUANCE_PROVIDER_GATE=anthropic`のように指定する（モデル未指定時はそのプロバイダの
+既定モデルにフォールバックする）。
 
-モデルごとの挙動差（`thinking` の形式、`server-side fallback` の対応可否）は
+料金は変動が大きいため本README上の数値は目安・要確認とする。判定精度を優先したい場合は
+`NUANCE_PROVIDER_GATE=anthropic`かつ`NUANCE_MODEL_GATE=claude-opus-5`のように
+プロバイダ・モデルの両方を個別に上書きできる。
+
+Anthropicモデルごとの挙動差（`thinking` の形式、`server-side fallback` の対応可否）は
 [`lib/models.ts`](./lib/models.ts) の `MODEL_REGISTRY` に集約している。
 Claude Opus 5 / Fable 5 は adaptive thinking と server-side fallback（refusal時の
 自動フォールバック）に対応するが、Haiku 4.5 のような旧世代のパラメータ体系のモデルは
 adaptive thinking 自体に対応していないため、単純にモデル名だけ差し替えると壊れる。
 レジストリに無いモデルIDを指定した場合は、thinking省略・fallback無しという最も安全側の
 設定にフォールバックする。新しいモデルを正式サポートするには `MODEL_REGISTRY` に追記すればよい。
+OpenRouter側はOpenAI互換の単純なリクエスト形式のみのため、このような差異は無い。
+
+プロバイダ判定と実際のAPI呼び出しの分岐は [`lib/dispatch.ts`](./lib/dispatch.ts) の
+`complete()`に一箇所だけ集約している。`hasCredentialsFor(task)`が、その処理が実際に
+解決するプロバイダの認証情報が揃っているかを見てデモ/liveを切り替えるため、
+たとえば`ANTHROPIC_API_KEY`だけ設定して`OPENROUTER_API_KEY`を設定し忘れても、
+filter は正しくデモモードにフォールバックする（Anthropicの鍵の有無だけで
+一律判定していないのがポイント）。
 
 ## 既知の制約
 

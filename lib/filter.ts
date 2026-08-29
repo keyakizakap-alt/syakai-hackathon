@@ -1,8 +1,7 @@
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
 
-import { assertNoRefusal, getClient, sanitizeForPrompt, TONE_RULE } from "./claude";
-import { resolveModel } from "./models";
+import { sanitizeForPrompt, TONE_RULE } from "./claude";
+import { complete } from "./dispatch";
 import { WORKS } from "./works";
 import type { FilterResult, TagMapping, WorkVerdict } from "./types";
 
@@ -83,29 +82,9 @@ confidence が低いということは「安全側に倒した」という意味
 
 export async function runFilter(declaration: string): Promise<FilterResult> {
   const started = Date.now();
-  const client = getClient();
-  const { model, thinking, betas, fallbacks } = resolveModel("filter");
-
-  const res = await client.beta.messages.parse({
-    model,
-    max_tokens: 16000,
-    betas,
-    ...(fallbacks && { fallbacks }),
-    ...(thinking && { thinking }),
-    system: SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content:
-          `読者の宣言:\n<宣言>\n${sanitizeForPrompt(declaration)}\n</宣言>\n\n` +
-          `作品一覧:\n${worksBlock()}`,
-      },
-    ],
-    output_config: { format: zodOutputFormat(FilterSchema) },
-  });
-  assertNoRefusal(res);
-  const parsed = res.parsed_output;
-  if (!parsed) throw new Error("受信フィルタの構造化出力を取得できませんでした");
+  const user =
+    `読者の宣言:\n<宣言>\n${sanitizeForPrompt(declaration)}\n</宣言>\n\n` + `作品一覧:\n${worksBlock()}`;
+  const parsed = await complete("filter", SYSTEM, user, FilterSchema);
 
   const byId = new Map(parsed.verdicts.map((v) => [v.work_id, v]));
   const verdicts: WorkVerdict[] = WORKS.map((w) => {

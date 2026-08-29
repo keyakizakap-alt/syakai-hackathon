@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { hasCredentials, NoCredentialsError, RefusalError } from "@/lib/claude";
+import { NoCredentialsError, RefusalError } from "@/lib/claude";
 import { demoFilterResult, FILTER_PRESETS } from "@/lib/demo-filter";
+import { hasCredentialsFor } from "@/lib/dispatch";
 import { runFilter } from "@/lib/filter";
 
 export const runtime = "nodejs";
@@ -30,13 +31,15 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!hasCredentials()) {
+  if (!hasCredentialsFor("filter")) {
     const demo = demoFilterResult(declaration);
     if (demo) return NextResponse.json(demo);
     return NextResponse.json(
       {
         error:
-          "ANTHROPIC_API_KEY が未設定のためデモモードで動作しています。" +
+          "API キーが未設定のためデモモードで動作しています" +
+          "（既定では OPENROUTER_API_KEY が必要。ANTHROPIC_API_KEY に切り替える場合は" +
+          " NUANCE_PROVIDER_FILTER=anthropic を設定）。" +
           "任意の宣言でフィルタするには API キーを設定してください。",
         presets: FILTER_PRESETS.map((p) => p.text),
       },

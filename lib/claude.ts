@@ -3,8 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 // モデルID・thinking設定・fallback可否は処理ごとに lib/models.ts の resolveModel() で解決する。
 
 export class NoCredentialsError extends Error {
-  constructor() {
-    super("ANTHROPIC_API_KEY が設定されていません");
+  constructor(envVar: string) {
+    super(`${envVar} が設定されていません`);
     this.name = "NoCredentialsError";
   }
 }
@@ -21,7 +21,7 @@ export function hasCredentials(): boolean {
 }
 
 export function getClient(): Anthropic {
-  if (!hasCredentials()) throw new NoCredentialsError();
+  if (!hasCredentials()) throw new NoCredentialsError("ANTHROPIC_API_KEY");
   return new Anthropic();
 }
 

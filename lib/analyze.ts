@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
 
 import { assertNoRefusal, getClient, POLARITY_GUARD, sanitizeForPrompt, TONE_RULE } from "./claude";
+import { complete } from "./dispatch";
 import { resolveModel } from "./models";
 
 import { NORM_CARDS } from "./norms";
@@ -162,27 +163,10 @@ async function runPanel(client: Anthropic, input: string, hits: GlossaryEntry[])
   });
 }
 
-async function runGate(client: Anthropic, input: string, hits: GlossaryEntry[]): Promise<BackTranslation[]> {
+async function runGate(input: string, hits: GlossaryEntry[]): Promise<BackTranslation[]> {
   const targets = CULTURE_IDS.map((id) => `- ${id}: ${CULTURES[id].language}`).join("\n");
-  const { model, thinking, betas, fallbacks } = resolveModel("gate");
-  const res = await client.beta.messages.parse({
-    model,
-    max_tokens: 16000,
-    betas,
-    ...(fallbacks && { fallbacks }),
-    ...(thinking && { thinking }),
-    system: gateSystem(hits),
-    messages: [
-      {
-        role: "user",
-        content: `次の原文を各言語へ訳し、逆翻訳して採点せよ。\n\n<原文>\n${sanitizeForPrompt(input)}\n</原文>\n\n<対象言語>\n${targets}\n</対象言語>`,
-      },
-    ],
-    output_config: { format: zodOutputFormat(GateSchema) },
-  });
-  assertNoRefusal(res);
-  const parsed = res.parsed_output;
-  if (!parsed) throw new Error("逆翻訳ゲートの構造化出力を取得できませんでした");
+  const user = `次の原文を各言語へ訳し、逆翻訳して採点せよ。\n\n<原文>\n${sanitizeForPrompt(input)}\n</原文>\n\n<対象言語>\n${targets}\n</対象言語>`;
+  const parsed = await complete("gate", gateSystem(hits), user, GateSchema);
 
   const byCulture = new Map(parsed.results.map((r) => [r.culture, r]));
   return CULTURE_IDS.map((id): BackTranslation => {
@@ -250,7 +234,7 @@ export async function analyze(input: string): Promise<CheckResult> {
   // allSettled で受けて部分的な結果を返せるようにしている。
   const [panelRes, gateRes] = await Promise.allSettled([
     runPanel(client, input, hits),
-    runGate(client, input, hits),
+    runGate(input, hits),
   ]);
 
   // ペルソナ判定が落ちた場合だけは返せるものが無いので、そのまま失敗させる
