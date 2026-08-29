@@ -46,7 +46,7 @@ function WorkCard({ verdict }: { verdict: WorkVerdict }) {
   const hidden = verdict.decision === "block" && !revealed;
 
   return (
-    <article className="rise overflow-hidden rounded-lg border border-(--color-line) bg-(--color-panel)">
+    <article className="rise overflow-hidden rounded-xl border border-(--color-line) bg-(--color-panel)">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-(--color-line) px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold text-(--color-ink) ${LANG_CLS[work.lang]}`}>
@@ -157,18 +157,20 @@ export function FilterPanel() {
         見たくないものを自分の言葉で書けば、どの言語圏の作品でも事前に遮断します。
       </p>
 
-      <PromptBox
-        presets={FILTER_PRESETS}
-        value={text}
-        onChange={setText}
-        onSubmit={run}
-        loading={loading}
-        maxChars={MAX_CHARS}
-        placeholder="見たくないものを、自分の言葉で書いてください（タグ名を知らなくて構いません）"
-        submitLabel="入国審査をかける"
-        loadingLabel="照合中…"
-        stale={Boolean(result) && text.trim() !== result?.declaration}
-      />
+      <div className="mb-6">
+        <PromptBox
+          presets={FILTER_PRESETS}
+          value={text}
+          onChange={setText}
+          onSubmit={run}
+          loading={loading}
+          maxChars={MAX_CHARS}
+          placeholder="見たくないものを、自分の言葉で書いてください（タグ名を知らなくて構いません）"
+          submitLabel="入国審査をかける"
+          loadingLabel="照合中…"
+          stale={Boolean(result) && text.trim() !== result?.declaration}
+        />
+      </div>
 
       {loading && (
         <p className="rounded-lg border border-(--color-line) bg-(--color-panel) px-4 py-6 text-center text-sm text-(--color-muted)">
@@ -184,7 +186,7 @@ export function FilterPanel() {
 
       {result && counts && (
         <div className="space-y-5">
-          <section className="rise rounded-lg border border-(--color-line) bg-(--color-panel) px-5 py-4">
+          <section className="rise rounded-xl border border-(--color-line) bg-(--color-panel) px-5 py-4">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-(--color-red)/40 bg-(--color-red)/8 px-3 py-1 text-sm font-semibold text-(--color-red)">
                 遮断 {counts.block}

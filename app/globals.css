@@ -1,15 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #0b0e14;
-  --color-panel: #131824;
-  --color-panel-2: #1a2030;
-  --color-line: #2a3242;
-  --color-fg: #e6e9f0;
-  --color-muted: #8b95a8;
+  --color-ink: #0a0e17;
+  --color-panel: #121826;
+  --color-panel-2: #182036;
+  --color-line: #262f45;
+  --color-fg: #e8ebf3;
+  --color-muted: #8992a9;
   --color-green: #3fb950;
   --color-yellow: #d9a441;
-  --color-red: #e05252;
+  --color-red: #e35a6b;
+  /* アプリのアクセント（ブルー→パープル）。判定の信号色(緑/黄/赤)とは別系統 */
+  --color-accent-a: #4d7bf3;
+  --color-accent-b: #9b5de5;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -23,6 +26,20 @@ body {
   font-family:
     ui-sans-serif, system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
   font-feature-settings: "palt";
+  /* ヘッダー付近だけ淡く光るような質感。派手なヒーロー演出は入れない */
+  background-image: radial-gradient(60rem 30rem at 20% -10%, color-mix(in oklab, var(--color-accent-a) 14%, transparent), transparent 60%),
+    radial-gradient(50rem 26rem at 100% 0%, color-mix(in oklab, var(--color-accent-b) 10%, transparent), transparent 55%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+.accent-gradient {
+  background-image: linear-gradient(135deg, var(--color-accent-a), var(--color-accent-b));
+}
+
+.accent-border-glow {
+  border-color: color-mix(in oklab, var(--color-accent-a) 35%, var(--color-line));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent-a) 10%, transparent) inset;
 }
 
 /* 判定結果カードの登場 */

@@ -37,7 +37,7 @@ export function PromptBox({
   stale: boolean;
 }) {
   return (
-    <section className="mb-6">
+    <section>
       <div className="mb-2 flex flex-wrap gap-2">
         {presets.map((p) => (
           <button
@@ -49,7 +49,7 @@ export function PromptBox({
             }}
             disabled={loading}
             title={p.hook}
-            className="rounded-full border border-(--color-line) bg-(--color-panel) px-3 py-1.5 text-xs text-(--color-muted) transition hover:border-(--color-muted) hover:text-(--color-fg) disabled:opacity-50"
+            className="rounded-full border border-(--color-line) bg-(--color-panel) px-3 py-1.5 text-xs text-(--color-muted) transition hover:border-(--color-accent-a)/50 hover:text-(--color-fg) disabled:opacity-50"
           >
             {p.label}
           </button>
@@ -70,30 +70,47 @@ export function PromptBox({
             onSubmit(value);
           }
         }}
-        rows={4}
+        rows={6}
         maxLength={maxChars}
         placeholder={placeholder}
-        className="w-full resize-y rounded-lg border border-(--color-line) bg-(--color-panel) px-4 py-3 text-sm leading-relaxed outline-none placeholder:text-(--color-muted)/60 focus:border-(--color-muted)"
+        className="w-full resize-y rounded-xl border border-(--color-line) bg-(--color-panel) px-4 py-3 text-sm leading-relaxed outline-none placeholder:text-(--color-muted)/60 focus:border-(--color-accent-a)/60"
       />
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
         <span className="font-mono text-xs text-(--color-muted)">
           {value.length} / {maxChars}
-          <span className="ml-3 hidden sm:inline">⌘/Ctrl + Enter</span>
+          <span className="ml-3 hidden sm:inline">Ctrl / ⌘ + Enter で検査実行</span>
         </span>
-        <button
-          type="button"
-          onClick={() => onSubmit(value)}
-          disabled={loading || value.trim().length === 0}
-          className="rounded-lg bg-(--color-fg) px-5 py-2 text-sm font-semibold text-(--color-ink) transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {loading ? loadingLabel : submitLabel}
-        </button>
+        {value.length > 0 && !loading && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="text-xs text-(--color-muted) underline underline-offset-4 transition hover:text-(--color-fg)"
+          >
+            クリア
+          </button>
+        )}
       </div>
 
+      <button
+        type="button"
+        onClick={() => onSubmit(value)}
+        disabled={loading || value.trim().length === 0}
+        className="accent-gradient mt-3 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_var(--color-accent-a)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+      >
+        {loading ? (
+          loadingLabel
+        ) : (
+          <>
+            {submitLabel}
+            <span aria-hidden>→</span>
+          </>
+        )}
+      </button>
+
       {stale && !loading && (
-        <p className="mt-2 rounded border border-(--color-yellow)/30 bg-(--color-yellow)/8 px-3 py-2 text-xs text-(--color-yellow)">
-          入力が変更されています。下の結果は編集前のものです。
+        <p className="mt-2 rounded-lg border border-(--color-yellow)/30 bg-(--color-yellow)/8 px-3 py-2 text-xs text-(--color-yellow)">
+          入力が変更されています。右側の結果は編集前のものです。
         </p>
       )}
     </section>
