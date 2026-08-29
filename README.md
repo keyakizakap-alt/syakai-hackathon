@@ -78,6 +78,18 @@ cp .env.example .env.local   # ANTHROPIC_API_KEY を設定
 | `npm run build` | 本番ビルド |
 | `npm run typecheck` | 型チェック |
 
+## Vercelへのデプロイ
+
+GitHub連携でmainブランチへのpushごとに自動デプロイされる構成。
+
+1. Vercelでこのリポジトリをインポート（Next.jsは自動検出される）
+2. Project Settings → Environment Variables に `ANTHROPIC_API_KEY` を設定
+   （未設定でもデモモードでデプロイは成功する）
+3. `main` へのpushで自動的にビルド・デプロイされる
+
+APIルートは Node.js ランタイム・`maxDuration = 60`（Hobbyプランの上限）を明示済みで、
+追加の `vercel.json` は不要。
+
 ## 構成
 
 ```
