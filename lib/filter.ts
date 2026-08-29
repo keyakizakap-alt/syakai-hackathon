@@ -1,7 +1,8 @@
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
 
-import { assertNoRefusal, FALLBACK_BETA, getClient, MODEL, sanitizeForPrompt, TONE_RULE } from "./claude";
+import { assertNoRefusal, getClient, sanitizeForPrompt, TONE_RULE } from "./claude";
+import { resolveModel } from "./models";
 import { WORKS } from "./works";
 import type { FilterResult, TagMapping, WorkVerdict } from "./types";
 
@@ -83,13 +84,14 @@ confidence が低いということは「安全側に倒した」という意味
 export async function runFilter(declaration: string): Promise<FilterResult> {
   const started = Date.now();
   const client = getClient();
+  const { model, thinking, betas, fallbacks } = resolveModel("filter");
 
   const res = await client.beta.messages.parse({
-    model: MODEL,
+    model,
     max_tokens: 16000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    thinking: { type: "adaptive" },
+    betas,
+    ...(fallbacks && { fallbacks }),
+    ...(thinking && { thinking }),
     system: SYSTEM,
     messages: [
       {

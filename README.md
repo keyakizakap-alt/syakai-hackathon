@@ -99,11 +99,13 @@ app/
   api/filter/route.ts  入国審査API
 lib/
   claude.ts            クライアント・共通プロンプト制約・入力の無害化
+  models.ts            処理ごとに使うモデルを解決するレジストリ（詳細は下記）
   norms.ts             文化規範カード 4文化 × 12項目 ← 中核の知識資産
   glossary.ts          ファンダム語彙集（完全一致・長い語優先でマスクしながら照合）
   analyze.ts           ペルソナ判定と逆翻訳ゲートを並列実行し、ゲートで昇格させる
   filter.ts            自然文 → 多言語タグ写像 → 作品の遮断判定
   works.ts             架空作品12件。言語圏ごとのタグ文化の非対称を再現している
+  summary.ts           結果サマリ用（最もリスクが高い文化圏の抽出・リスクスコアのラベル化）
   demo.ts / demo-filter.ts  プリセット例とデモモードの応答
 components/
   PromptBox.tsx        プリセット＋入力欄（両タブ共通）
@@ -115,8 +117,29 @@ components/
 ユーザー入力は必ず XML 風タグで囲んでプロンプトに渡すが、閉じタグを書かれると
 そこでデータ領域を抜けられるため、山括弧を全角に置換してから埋め込んでいる（`sanitizeForPrompt`）。
 
-モデルは `claude-opus-5`、adaptive thinking、構造化出力（Zod）。
-refusal に備えてサーバーサイド・フォールバック（`fallbacks: "default"`）を有効にしている。
+## モデルの切り替え
+
+3つの処理はそれぞれ独立したモデルを使う。**基本モデルは Claude Sonnet 5** で、
+panel と並列/毎回実行される gate・filter は最安ティアの Haiku 4.5 を既定にしている。
+
+| 処理 | 内容 | 既定モデル | 環境変数 |
+|---|---|---|---|
+| panel | 4文化ペルソナ判定（プロダクトの核） | `claude-sonnet-5` | `NUANCE_MODEL_PANEL` |
+| gate | 逆翻訳による品質採点（機械的・毎回並列実行） | `claude-haiku-4-5` | `NUANCE_MODEL_GATE` |
+| filter | 受信フィルタのタグ写像 | `claude-haiku-4-5` | `NUANCE_MODEL_FILTER` |
+
+料金の目安（Anthropic公式・入力/出力 per 1Mトークン）：Opus 5 = $5/$25、Sonnet 5 = $3/$15、
+Haiku 4.5 = $1/$5。gate・filter を Haiku 4.5 にするだけで、全処理を Opus 5 固定にした場合より
+大きくコストが下がる。判定精度を優先したい場合は `NUANCE_MODEL_PANEL=claude-opus-5` のように
+環境変数で個別に上書きできる。
+
+モデルごとの挙動差（`thinking` の形式、`server-side fallback` の対応可否）は
+[`lib/models.ts`](./lib/models.ts) の `MODEL_REGISTRY` に集約している。
+Claude Opus 5 / Fable 5 は adaptive thinking と server-side fallback（refusal時の
+自動フォールバック）に対応するが、Haiku 4.5 のような旧世代のパラメータ体系のモデルは
+adaptive thinking 自体に対応していないため、単純にモデル名だけ差し替えると壊れる。
+レジストリに無いモデルIDを指定した場合は、thinking省略・fallback無しという最も安全側の
+設定にフォールバックする。新しいモデルを正式サポートするには `MODEL_REGISTRY` に追記すればよい。
 
 ## 既知の制約
 

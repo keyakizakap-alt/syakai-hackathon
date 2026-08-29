@@ -1,8 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-export const MODEL = "claude-opus-5";
-/** Claude Opus 5 の refusal に対するサーバーサイド・フォールバック */
-export const FALLBACK_BETA = "server-side-fallback-2026-07-01";
+// モデルID・thinking設定・fallback可否は処理ごとに lib/models.ts の resolveModel() で解決する。
 
 export class NoCredentialsError extends Error {
   constructor() {

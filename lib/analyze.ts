@@ -2,15 +2,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
 
-import {
-  assertNoRefusal,
-  FALLBACK_BETA,
-  getClient,
-  MODEL,
-  POLARITY_GUARD,
-  sanitizeForPrompt,
-  TONE_RULE,
-} from "./claude";
+import { assertNoRefusal, getClient, POLARITY_GUARD, sanitizeForPrompt, TONE_RULE } from "./claude";
+import { resolveModel } from "./models";
 
 import { NORM_CARDS } from "./norms";
 import { lookupGlossary, toHit, type GlossaryEntry } from "./glossary";
@@ -136,12 +129,13 @@ ${glossaryBlock(hits)}
 // ── 呼び出し ───────────────────────────────────────────────────
 
 async function runPanel(client: Anthropic, input: string, hits: GlossaryEntry[]): Promise<CultureReading[]> {
+  const { model, thinking, betas, fallbacks } = resolveModel("panel");
   const res = await client.beta.messages.parse({
-    model: MODEL,
+    model,
     max_tokens: 16000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    thinking: { type: "adaptive" },
+    betas,
+    ...(fallbacks && { fallbacks }),
+    ...(thinking && { thinking }),
     system: panelSystem(hits),
     messages: [{ role: "user", content: `次の投稿文を判定せよ。\n\n<投稿文>\n${sanitizeForPrompt(input)}\n</投稿文>` }],
     output_config: { format: zodOutputFormat(PanelSchema) },
@@ -170,12 +164,13 @@ async function runPanel(client: Anthropic, input: string, hits: GlossaryEntry[])
 
 async function runGate(client: Anthropic, input: string, hits: GlossaryEntry[]): Promise<BackTranslation[]> {
   const targets = CULTURE_IDS.map((id) => `- ${id}: ${CULTURES[id].language}`).join("\n");
+  const { model, thinking, betas, fallbacks } = resolveModel("gate");
   const res = await client.beta.messages.parse({
-    model: MODEL,
+    model,
     max_tokens: 16000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    thinking: { type: "adaptive" },
+    betas,
+    ...(fallbacks && { fallbacks }),
+    ...(thinking && { thinking }),
     system: gateSystem(hits),
     messages: [
       {
