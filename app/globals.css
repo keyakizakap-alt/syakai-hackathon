@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0b0e14;
+  --color-panel: #131824;
+  --color-panel-2: #1a2030;
+  --color-line: #2a3242;
+  --color-fg: #e6e9f0;
+  --color-muted: #8b95a8;
+  --color-green: #3fb950;
+  --color-yellow: #d9a441;
+  --color-red: #e05252;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  background: var(--color-ink);
+  color: var(--color-fg);
+}
+
+body {
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+  font-feature-settings: "palt";
+}
+
+/* 判定結果カードの登場 */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.28s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
+}
