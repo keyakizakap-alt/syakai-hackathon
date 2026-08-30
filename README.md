@@ -62,14 +62,14 @@ npm install
 npm run dev     # http://localhost:3000
 ```
 
-**APIキーなしでも動く。** `ANTHROPIC_API_KEY` 未設定時はデモモードになり、
+**APIキーなしでも動く。** `OPENROUTER_API_KEY` 未設定時はデモモードになり、
 プリセット（出国審査4例 / 入国審査1例）を判定できる。
 当日キーが使えない事態への保険も兼ねている。
 
 任意の文章を判定するには：
 
 ```bash
-cp .env.example .env.local   # ANTHROPIC_API_KEY を設定
+cp .env.example .env.local   # OPENROUTER_API_KEY を設定
 ```
 
 | コマンド | 内容 |
@@ -83,7 +83,7 @@ cp .env.example .env.local   # ANTHROPIC_API_KEY を設定
 GitHub連携でmainブランチへのpushごとに自動デプロイされる構成。
 
 1. Vercelでこのリポジトリをインポート（Next.jsは自動検出される）
-2. Project Settings → Environment Variables に `ANTHROPIC_API_KEY` を設定
+2. Project Settings → Environment Variables に `OPENROUTER_API_KEY` を設定
    （未設定でもデモモードでデプロイは成功する）
 3. `main` へのpushで自動的にビルド・デプロイされる
 
@@ -98,10 +98,11 @@ app/
   api/check/route.ts   出国審査API（キーの有無で live/demo を切り替え）
   api/filter/route.ts  入国審査API
 lib/
-  claude.ts            Anthropicクライアント・共通プロンプト制約・入力の無害化
-  openrouter.ts        OpenRouter（Gemini/Llama等）クライアント
-  models.ts            処理ごとに使うプロバイダ・モデルを解決するレジストリ（詳細は下記）
-  dispatch.ts          プロバイダ分岐を一箇所に集約する呼び出し口（complete）
+  prompts.ts           共通プロンプト制約（TONE_RULE等）・入力の無害化
+  errors.ts            プロバイダ非依存のエラークラス（NoCredentialsError, RefusalError）
+  openrouter.ts        OpenRouterクライアント。全処理（panel/gate/filter）がこれ一本を通る
+  models.ts            処理ごとに使うモデル・フォールバック候補を解決するレジストリ（詳細は下記）
+  dispatch.ts          呼び出し口を一箇所に集約する共通口（complete）
   norms.ts             文化規範カード 4文化 × 12項目 ← 中核の知識資産
   glossary.ts          ファンダム語彙集（完全一致・長い語優先でマスクしながら照合）
   analyze.ts           ペルソナ判定と逆翻訳ゲートを並列実行し、ゲートで昇格させる
@@ -121,42 +122,43 @@ components/
 
 ## モデルの切り替え
 
-3つの処理はそれぞれ独立したプロバイダ・モデルを使う。**panel（核となる文化規範判定）は
-精度優先で常に Claude**。gate・filter は panel と並列/毎回実行される機械的な処理のため、
-**OpenRouter経由の安価なモデルを既定**にしている。
+全処理（panel/gate/filter）は[OpenRouter](https://openrouter.ai/)一本に統一されている。
+OpenRouterはClaude・Gemini・GPTなど多数のモデルを**1つのAPIキー・OpenAI互換の1つの
+API形式**で呼び出せるプロキシ。**panel（核となる文化規範判定）はOpenRouter経由でも
+同じ`anthropic/claude-sonnet-5`を使う**ため判定品質は変わらない。gate・filter は
+panel と並列/毎回実行される機械的な処理のため、安価なモデルを既定にしている。
 
-| 処理 | 内容 | 既定プロバイダ | 既定モデル |
-|---|---|---|---|
-| panel | 4文化ペルソナ判定（プロダクトの核） | Anthropic | `claude-sonnet-5` |
-| gate | 逆翻訳による品質採点（機械的・毎回並列実行） | OpenRouter | `google/gemini-2.5-flash` |
-| filter | 受信フィルタのタグ写像 | OpenRouter | `google/gemini-2.5-flash` |
+| 処理 | 内容 | 既定モデル |
+|---|---|---|
+| panel | 4文化ペルソナ判定（プロダクトの核） | `anthropic/claude-sonnet-5` |
+| gate | 逆翻訳による品質採点（機械的・毎回並列実行） | `google/gemini-2.5-flash` |
+| filter | 受信フィルタのタグ写像 | `google/gemini-2.5-flash` |
 
-[OpenRouter](https://openrouter.ai/)はGemini・Llama・DeepSeekなど多数のモデルを
-**1つのAPIキー・OpenAI互換の1つのAPI形式**で呼び出せるプロキシ。`NUANCE_MODEL_GATE`に
-OpenRouter上の任意のモデルID（例：`meta-llama/llama-3.3-70b-instruct`）を指定するだけで、
-コード変更なしにモデルを切り替えられる。プロバイダ自体をAnthropicに戻したい場合は
-`NUANCE_PROVIDER_GATE=anthropic`のように指定する（モデル未指定時はそのプロバイダの
-既定モデルにフォールバックする）。
+`NUANCE_MODEL_PANEL`等の環境変数にOpenRouter上の任意のモデルID（`provider/model-name`
+形式、例：`openai/gpt-5.1`）を指定するだけで、コード変更なしにモデルを切り替えられる。
 
-料金は変動が大きいため本README上の数値は目安・要確認とする。判定精度を優先したい場合は
-`NUANCE_PROVIDER_GATE=anthropic`かつ`NUANCE_MODEL_GATE=claude-opus-5`のように
-プロバイダ・モデルの両方を個別に上書きできる。
+### 安全性・堅牢性：3層構造
 
-Anthropicモデルごとの挙動差（`thinking` の形式、`server-side fallback` の対応可否）は
-[`lib/models.ts`](./lib/models.ts) の `MODEL_REGISTRY` に集約している。
-Claude Opus 5 / Fable 5 は adaptive thinking と server-side fallback（refusal時の
-自動フォールバック）に対応するが、Haiku 4.5 のような旧世代のパラメータ体系のモデルは
-adaptive thinking 自体に対応していないため、単純にモデル名だけ差し替えると壊れる。
-レジストリに無いモデルIDを指定した場合は、thinking省略・fallback無しという最も安全側の
-設定にフォールバックする。新しいモデルを正式サポートするには `MODEL_REGISTRY` に追記すればよい。
-OpenRouter側はOpenAI互換の単純なリクエスト形式のみのため、このような差異は無い。
+「refusal（モデルの拒否）で処理が落ちる」ことへの対策を3層に分けている。
 
-プロバイダ判定と実際のAPI呼び出しの分岐は [`lib/dispatch.ts`](./lib/dispatch.ts) の
-`complete()`に一箇所だけ集約している。`hasCredentialsFor(task)`が、その処理が実際に
-解決するプロバイダの認証情報が揃っているかを見てデモ/liveを切り替えるため、
-たとえば`ANTHROPIC_API_KEY`だけ設定して`OPENROUTER_API_KEY`を設定し忘れても、
-filter は正しくデモモードにフォールバックする（Anthropicの鍵の有無だけで
-一律判定していないのがポイント）。
+1. **プロンプト補強**：このアプリは「危うさの分類・警告」が目的で、有害コンテンツの
+   生成が目的ではない。共通の`TONE_RULE`（[`lib/prompts.ts`](./lib/prompts.ts)）に
+   「分類者であり生成者ではない」という一文を入れ、題材の過激さと目的の混同による
+   過剰拒否を根本から減らす。
+2. **自動フォールバック**：OpenRouterの`models`配列（[`lib/openrouter.ts`](./lib/openrouter.ts)）
+   で、1つ目のモデルが拒否・レート制限・障害で失敗した場合に次点モデルへ自動フェイル
+   オーバーする。panelには異なるベンダーのモデル（`openai/gpt-5.1`、
+   `google/gemini-3.1-pro-preview`）を候補として設定し、同一ベンダーが同じ理由で
+   連鎖的に拒否するリスクを下げている（[`lib/models.ts`](./lib/models.ts)の`TASK_FALLBACKS`）。
+3. **縮退運転**：層1・2を通してもpanel全体が失敗した場合の最終手段として、4文化を
+   まとめた1リクエストから、4文化個別の4リクエストに分割して再試行する
+   （[`lib/analyze.ts`](./lib/analyze.ts)の`runPanelSplit`）。通常は発火せず、
+   比較読みができる統合リクエストの価値を優先する。個別の文化判定がさらに失敗した
+   場合は、その文化だけ安全側の既定値（green・トリガー無し）で埋める。
+
+`complete()`（[`lib/dispatch.ts`](./lib/dispatch.ts)）が全処理の呼び出し口を一箇所に
+集約している。`hasCredentialsFor(task)`が`OPENROUTER_API_KEY`の有無を見てデモ/liveを
+切り替える。
 
 ## 既知の制約
 

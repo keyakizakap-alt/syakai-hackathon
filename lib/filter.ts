@@ -1,6 +1,6 @@
 import * as z from "zod/v4";
 
-import { sanitizeForPrompt, TONE_RULE } from "./claude";
+import { sanitizeForPrompt, TONE_RULE } from "./prompts";
 import { complete } from "./dispatch";
 import { WORKS } from "./works";
 import type { FilterResult, TagMapping, WorkVerdict } from "./types";

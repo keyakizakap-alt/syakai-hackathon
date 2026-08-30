@@ -1,10 +1,7 @@
-import type Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
 
-import { assertNoRefusal, getClient, POLARITY_GUARD, sanitizeForPrompt, TONE_RULE } from "./claude";
 import { complete } from "./dispatch";
-import { resolveModel } from "./models";
+import { POLARITY_GUARD, sanitizeForPrompt, TONE_RULE } from "./prompts";
 
 import { NORM_CARDS } from "./norms";
 import { lookupGlossary, toHit, type GlossaryEntry } from "./glossary";
@@ -33,6 +30,15 @@ const PanelSchema = z.object({
       rewrite: z.string().nullable(),
     }),
   ),
+});
+
+/** 層3（縮退運転）：1文化だけを判定するときのスキーマ */
+const SingleReadingSchema = z.object({
+  verdict: z.enum(["green", "yellow", "red"]),
+  risk: z.number().min(0).max(100),
+  reading: z.string(),
+  triggers: z.array(z.object({ span: z.string(), why: z.string() })),
+  rewrite: z.string().nullable(),
 });
 
 const GateSchema = z.object({
@@ -67,14 +73,30 @@ function glossaryBlock(hits: GlossaryEntry[]): string {
     .join("\n");
 }
 
-function panelSystem(hits: GlossaryEntry[]): string {
-  const cards = CULTURE_IDS.map((id) => {
-    const items = NORM_CARDS[id].map((n, i) => `  ${i + 1}. ${n}`).join("\n");
-    return `## ${id}（${CULTURES[id].label}）\n${items}`;
-  }).join("\n\n");
+/**
+ * cultureId を指定すると、その1文化だけを判定するプロンプトになる（層3の縮退運転用）。
+ * 省略時は従来通り4文化まとめて判定する。
+ */
+function panelSystem(hits: GlossaryEntry[], cultureId?: CultureId): string {
+  const targetIds = cultureId ? [cultureId] : CULTURE_IDS;
+  const cards = targetIds
+    .map((id) => {
+      const items = NORM_CARDS[id].map((n, i) => `  ${i + 1}. ${n}`).join("\n");
+      return `## ${id}（${CULTURES[id].label}）\n${items}`;
+    })
+    .join("\n\n");
+
+  const scope = cultureId
+    ? `一つの投稿文が、${CULTURES[cultureId].label}の読者に「どう着弾するか」を判定する。`
+    : `一つの投稿文が、4つのファンダム文化圏それぞれの読者に「どう着弾するか」を並列に判定する。`;
+
+  const outputRule = cultureId
+    ? `- reading は「${CULTURES[cultureId].label}の読者にはこう読める」を、その読者の視点で2〜3文で書く。`
+    : `- 4文化すべてについて必ず1件ずつ返す。
+- reading は「その文化圏の読者にはこう読める」を、その読者の視点で2〜3文で書く。`;
 
   return `あなたは越境ファンダムの文化翻訳を専門とする分析者である。
-一つの投稿文が、4つのファンダム文化圏それぞれの読者に「どう着弾するか」を並列に判定する。
+${scope}
 
 ${TONE_RULE}
 
@@ -89,8 +111,7 @@ ${cards}
 ${glossaryBlock(hits)}
 
 # 出力ルール
-- 4文化すべてについて必ず1件ずつ返す。
-- reading は「その文化圏の読者にはこう読める」を、その読者の視点で2〜3文で書く。
+${outputRule}
   原文の意図の説明ではなく、受信側の解釈を書くこと。
 - triggers.span は必ず**原文に実際に現れる部分文字列**をそのまま抜き出すこと。要約・言い換えは不可。
 - 引っかかる箇所がなければ triggers は空配列にする。無理に作らない。
@@ -129,28 +150,19 @@ ${glossaryBlock(hits)}
 
 // ── 呼び出し ───────────────────────────────────────────────────
 
-async function runPanel(client: Anthropic, input: string, hits: GlossaryEntry[]): Promise<CultureReading[]> {
-  const { model, thinking, betas, fallbacks } = resolveModel("panel");
-  const res = await client.beta.messages.parse({
-    model,
-    max_tokens: 16000,
-    betas,
-    ...(fallbacks && { fallbacks }),
-    ...(thinking && { thinking }),
-    system: panelSystem(hits),
-    messages: [{ role: "user", content: `次の投稿文を判定せよ。\n\n<投稿文>\n${sanitizeForPrompt(input)}\n</投稿文>` }],
-    output_config: { format: zodOutputFormat(PanelSchema) },
-  });
-  assertNoRefusal(res);
-  const parsed = res.parsed_output;
-  if (!parsed) throw new Error("文化ペルソナ判定の構造化出力を取得できませんでした");
+function safeCultureReading(id: CultureId): CultureReading {
+  return { culture: id, verdict: "green", risk: 0, reading: "（判定を取得できませんでした）", triggers: [], rewrite: null };
+}
+
+/** 4文化まとめて1回のリクエストで判定する（通常運用のパス） */
+async function runPanelCombined(input: string, hits: GlossaryEntry[]): Promise<CultureReading[]> {
+  const user = `次の投稿文を判定せよ。\n\n<投稿文>\n${sanitizeForPrompt(input)}\n</投稿文>`;
+  const parsed = await complete("panel", panelSystem(hits), user, PanelSchema);
 
   const byCulture = new Map(parsed.readings.map((r) => [r.culture, r]));
   return CULTURE_IDS.map((id): CultureReading => {
     const r = byCulture.get(id);
-    if (!r) {
-      return { culture: id, verdict: "green", risk: 0, reading: "（判定を取得できませんでした）", triggers: [], rewrite: null };
-    }
+    if (!r) return safeCultureReading(id);
     return {
       culture: id,
       verdict: r.verdict,
@@ -161,6 +173,45 @@ async function runPanel(client: Anthropic, input: string, hits: GlossaryEntry[])
       rewrite: r.rewrite,
     };
   });
+}
+
+/** 層3（縮退運転）：1文化ずつ個別リクエストに分割する。統合判定が全滅した場合の最終手段 */
+async function runPanelSplit(input: string, hits: GlossaryEntry[]): Promise<CultureReading[]> {
+  const user = `次の投稿文を判定せよ。\n\n<投稿文>\n${sanitizeForPrompt(input)}\n</投稿文>`;
+  const settled = await Promise.allSettled(
+    CULTURE_IDS.map(async (id): Promise<CultureReading> => {
+      const parsed = await complete("panel", panelSystem(hits, id), user, SingleReadingSchema);
+      return {
+        culture: id,
+        verdict: parsed.verdict,
+        risk: Math.round(parsed.risk),
+        reading: parsed.reading,
+        triggers: parsed.triggers.filter((t) => t.span.length > 0 && input.includes(t.span)),
+        rewrite: parsed.rewrite,
+      };
+    }),
+  );
+
+  return settled.map((s, i) => {
+    if (s.status === "fulfilled") return s.value;
+    console.error(`[panel] ${CULTURE_IDS[i]} の判定に失敗したため、安全側の既定値で埋めます`, s.reason);
+    return safeCultureReading(CULTURE_IDS[i]);
+  });
+}
+
+/**
+ * panel（核となる文化規範判定）。通常は4文化をまとめて1回のリクエストで判定する
+ * （比較読みが可能で、プロダクトの核心的な価値）。層1（プロンプト補強）・層2
+ * （OpenRouterのmodelsフォールバック配列）を通しても万一全滅した場合のみ、
+ * 4文化を個別リクエストに分割する縮退モードに落とす（層3）。
+ */
+async function runPanel(input: string, hits: GlossaryEntry[]): Promise<CultureReading[]> {
+  try {
+    return await runPanelCombined(input, hits);
+  } catch (err) {
+    console.error("[panel] 統合判定が全滅したため、文化ごとに分割して再試行します", err);
+    return runPanelSplit(input, hits);
+  }
 }
 
 async function runGate(input: string, hits: GlossaryEntry[]): Promise<BackTranslation[]> {
@@ -226,14 +277,13 @@ function overallOf(readings: CultureReading[]): Verdict {
 
 export async function analyze(input: string): Promise<CheckResult> {
   const started = Date.now();
-  const client = getClient();
   const hits = lookupGlossary(input);
 
   // ペルソナ判定と逆翻訳ゲートは互いに独立なので並列に走らせる。
   // ゲートだけ落ちた場合にペルソナ判定まで巻き添えで失うのは過剰なので、
   // allSettled で受けて部分的な結果を返せるようにしている。
   const [panelRes, gateRes] = await Promise.allSettled([
-    runPanel(client, input, hits),
+    runPanel(input, hits),
     runGate(input, hits),
   ]);
 

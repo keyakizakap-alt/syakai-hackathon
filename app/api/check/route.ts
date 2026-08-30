@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { analyze } from "@/lib/analyze";
-import { NoCredentialsError, RefusalError } from "@/lib/claude";
+import { NoCredentialsError, RefusalError } from "@/lib/errors";
 import { demoResult, PRESETS } from "@/lib/demo";
 import { hasCredentialsFor } from "@/lib/dispatch";
 
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "ANTHROPIC_API_KEY が未設定のためデモモードで動作しています。" +
+          "OPENROUTER_API_KEY が未設定のためデモモードで動作しています。" +
           "任意の文章を判定するには API キーを設定してください。デモモードではプリセット例のみ判定できます。",
         presets: PRESETS.map((p) => p.text),
       },

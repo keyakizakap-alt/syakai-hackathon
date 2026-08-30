@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { NoCredentialsError, RefusalError } from "@/lib/claude";
+import { NoCredentialsError, RefusalError } from "@/lib/errors";
 import { demoFilterResult, FILTER_PRESETS } from "@/lib/demo-filter";
 import { hasCredentialsFor } from "@/lib/dispatch";
 import { runFilter } from "@/lib/filter";
@@ -37,9 +37,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "API キーが未設定のためデモモードで動作しています" +
-          "（既定では OPENROUTER_API_KEY が必要。ANTHROPIC_API_KEY に切り替える場合は" +
-          " NUANCE_PROVIDER_FILTER=anthropic を設定）。" +
+          "OPENROUTER_API_KEY が未設定のためデモモードで動作しています。" +
           "任意の宣言でフィルタするには API キーを設定してください。",
         presets: FILTER_PRESETS.map((p) => p.text),
       },
