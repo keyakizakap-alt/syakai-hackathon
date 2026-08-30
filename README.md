@@ -173,7 +173,7 @@ components/
 
 ## モデルの切り替え
 
-全処理（panel/gate/filter）は[OpenRouter](https://openrouter.ai/)一本に統一されている。
+全処理（panel/gate/filter）は[OpenRouter](https://openrouter.ai/)一本に統一している。
 OpenRouterはClaude・Gemini・GPTなど多数のモデルを**1つのAPIキー・OpenAI互換の1つの
 API形式**で呼び出せるプロキシ。**panel（核となる文化規範判定）はOpenRouter経由でも
 同じ`anthropic/claude-sonnet-5`を使う**ため判定品質は変わらない。gate・filter は
