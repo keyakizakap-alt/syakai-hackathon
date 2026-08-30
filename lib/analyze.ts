@@ -1,7 +1,7 @@
 import * as z from "zod/v4";
 
 import { complete } from "./dispatch";
-import { POLARITY_GUARD, sanitizeForPrompt, TONE_RULE } from "./prompts";
+import { POLARITY_GUARD, sanitizeForPrompt, TONE_RULE, UNTRUSTED_INPUT_RULE } from "./prompts";
 
 import { NORM_CARDS } from "./norms";
 import { lookupGlossary, toHit, type GlossaryEntry } from "./glossary";
@@ -100,6 +100,8 @@ ${scope}
 
 ${TONE_RULE}
 
+${UNTRUSTED_INPUT_RULE}
+
 ${POLARITY_GUARD}
 
 # 文化規範カード
@@ -124,6 +126,8 @@ ${outputRule}
 function gateSystem(hits: GlossaryEntry[]): string {
   return `あなたは翻訳品質の検査官である。原文を各言語に訳し、それを原語に戻し、
 何が失われたかを4つの独立した次元で採点する。
+
+${UNTRUSTED_INPUT_RULE}
 
 ${POLARITY_GUARD}
 
@@ -150,8 +154,26 @@ ${glossaryBlock(hits)}
 
 // ── 呼び出し ───────────────────────────────────────────────────
 
-function safeCultureReading(id: CultureId): CultureReading {
-  return { culture: id, verdict: "green", risk: 0, reading: "（判定を取得できませんでした）", triggers: [], rewrite: null };
+/**
+ * 判定が取得できなかった文化圏を埋める値。
+ *
+ * **green を返してはならない。** 出国審査における green は「そのまま投稿して問題ない」
+ * という意味であり、実際には何も検査できていないのに安全だと言い切ることになる。
+ * 「取得できなかったので安全と答える」は、入国審査における「取得できなかったので通す」と
+ * 同じ、このプロダクトで最もやってはいけない失敗の仕方（フェイルオープン）である。
+ *
+ * yellow（誤読される可能性がある）に倒し、判定できなかった事実を reading に明記する。
+ * overallOf は最も重い verdict を採るため、これにより全体判定も安全側に寄る。
+ */
+function unjudgedCultureReading(id: CultureId): CultureReading {
+  return {
+    culture: id,
+    verdict: "yellow",
+    risk: 40,
+    reading: "この文化圏の判定を取得できませんでした。未検査のため、安全とは見なせません。時間をおいて再度お試しください。",
+    triggers: [],
+    rewrite: null,
+  };
 }
 
 /** 4文化まとめて1回のリクエストで判定する（通常運用のパス） */
@@ -162,7 +184,7 @@ async function runPanelCombined(input: string, hits: GlossaryEntry[]): Promise<C
   const byCulture = new Map(parsed.readings.map((r) => [r.culture, r]));
   return CULTURE_IDS.map((id): CultureReading => {
     const r = byCulture.get(id);
-    if (!r) return safeCultureReading(id);
+    if (!r) return unjudgedCultureReading(id);
     return {
       culture: id,
       verdict: r.verdict,
@@ -192,10 +214,20 @@ async function runPanelSplit(input: string, hits: GlossaryEntry[]): Promise<Cult
     }),
   );
 
+  // 全滅した場合は「判定できなかった」という結果を返してはならない。
+  // 4文化すべてが未検査のまま 200 で返すと、利用者には正常に判定されたように見え、
+  // 実際には何も検査されていないという最悪の誤認を生む。エラーとして扱う。
+  if (settled.every((s) => s.status === "rejected")) {
+    const first = settled.find((s) => s.status === "rejected");
+    throw new Error("文化ペルソナ判定がすべて失敗しました", {
+      cause: first?.status === "rejected" ? first.reason : undefined,
+    });
+  }
+
   return settled.map((s, i) => {
     if (s.status === "fulfilled") return s.value;
-    console.error(`[panel] ${CULTURE_IDS[i]} の判定に失敗したため、安全側の既定値で埋めます`, s.reason);
-    return safeCultureReading(CULTURE_IDS[i]);
+    console.error(`[panel] ${CULTURE_IDS[i]} の判定に失敗したため、未判定として扱います`, s.reason);
+    return unjudgedCultureReading(CULTURE_IDS[i]);
   });
 }
 

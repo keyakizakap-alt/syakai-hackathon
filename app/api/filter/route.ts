@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { guardRequest, readJsonBody, readTextField } from "@/lib/api-guard";
 import { NoCredentialsError, RefusalError } from "@/lib/errors";
 import { demoFilterResult, FILTER_PRESETS } from "@/lib/demo-filter";
 import { hasCredentialsFor } from "@/lib/dispatch";
@@ -11,25 +12,15 @@ export const maxDuration = 60;
 const MAX_CHARS = 400;
 
 export async function POST(req: Request) {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "リクエストボディが JSON ではありません" }, { status: 400 });
-  }
+  const blocked = guardRequest(req);
+  if (blocked) return blocked;
 
-  const raw = (body as { declaration?: unknown })?.declaration;
-  const declaration = typeof raw === "string" ? raw.trim() : "";
+  const parsed = await readJsonBody(req);
+  if ("error" in parsed) return parsed.error;
 
-  if (!declaration) {
-    return NextResponse.json({ error: "見たくないものを書いてください" }, { status: 400 });
-  }
-  if (declaration.length > MAX_CHARS) {
-    return NextResponse.json(
-      { error: `文字数の上限は ${MAX_CHARS} 文字です（現在 ${declaration.length} 文字）` },
-      { status: 400 },
-    );
-  }
+  const field = readTextField(parsed.body, "declaration", MAX_CHARS, "見たくないものを書いてください");
+  if ("error" in field) return field.error;
+  const declaration = field.value;
 
   if (!hasCredentialsFor("filter")) {
     const demo = demoFilterResult(declaration);
@@ -37,8 +28,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "OPENROUTER_API_KEY が未設定のためデモモードで動作しています。" +
-          "任意の宣言でフィルタするには API キーを設定してください。",
+          "デモモードで動作しています。任意の宣言でフィルタするには API キーの設定が必要です。",
         presets: FILTER_PRESETS.map((p) => p.text),
       },
       { status: 503 },
@@ -49,13 +39,16 @@ export async function POST(req: Request) {
     return NextResponse.json(await runFilter(declaration));
   } catch (err) {
     if (err instanceof NoCredentialsError) {
-      return NextResponse.json({ error: err.message }, { status: 503 });
+      return NextResponse.json({ error: "サーバー側の設定が不足しています" }, { status: 503 });
     }
     if (err instanceof RefusalError) {
-      return NextResponse.json({ error: err.message }, { status: 422 });
+      return NextResponse.json(
+        { error: "この宣言はモデルが判定を拒否しました。表現を変えてお試しください。" },
+        { status: 422 },
+      );
     }
+    // 例外の中身はサーバーログにのみ残す（内部構成の漏洩を防ぐ）
     console.error("[filter] フィルタに失敗しました", err);
-    const message = err instanceof Error ? err.message : "不明なエラー";
-    return NextResponse.json({ error: `フィルタに失敗しました: ${message}` }, { status: 500 });
+    return NextResponse.json({ error: "フィルタに失敗しました。しばらくしてからお試しください。" }, { status: 500 });
   }
 }
