@@ -339,5 +339,5 @@ export async function analyze(input: string): Promise<CheckResult> {
   };
 }
 
-export const __testing = { applyGate, overallOf };
+export const __testing = { applyGate, overallOf, unjudgedCultureReading };
 export type { CultureId };
