@@ -25,6 +25,21 @@
 | **出国審査**（発信前チェック） | 投稿しようとしている一文が、4つの文化圏でどう誤読されるかを事前に返す |
 | **入国審査**（受信フィルタ） | 見たくないものを自然文で書くと、どの言語圏の作品でも事前に遮断する |
 
+### 出国審査 — 同じ一文が、文化圏で判定が割れる
+
+![出国審査の判定結果](./docs/screenshots/02-check-result.png)
+
+「新衣装かわいすぎて死んだ💀 しんどい……もう無理……」に対し、
+**JP同人圏は 8（緑）、EN AO3圏は 88（赤）**。レーダーが一方向に伸びる。
+同じ熱量表現が、受信側の規範によって自傷・危機のサインとして着弾する。
+
+### 入国審査 — 1対1の対応表では機能しない
+
+![入国審査のタグ写像](./docs/screenshots/04-filter-result.png)
+
+「閉じ込められる」という日本語の自然文が、English では `Captivity / Confinement` と
+`hard no`、日本語では「監禁」、中文では「监禁 / 预警」へと、**条件付きで1対Nに写像される**。
+
 入国審査の要点は、**タグ文化そのものが言語圏ごとに違う**こと。
 英語圏は Archive Warnings と CW タグの明示が事実上の義務、日本語圏は「※」形式の短い注意書き、
 中国語圏は「雷点」「预警」、韓国語圏は「지뢰」だが定着度が低い。
@@ -130,6 +145,7 @@ cp .env.example .env.local   # OPENROUTER_API_KEY を設定
 | `npm run eval` | ベンチマーク（APIキー不要。ベースラインのみ） |
 | `npm run eval:live` | ベンチマーク（実モデル込み。`OPENROUTER_API_KEY` が必要） |
 | `npm run verify` | typecheck → test → eval を通しで実行 |
+| `npm run shots` | UIスクリーンショットを撮り直す（`docs/screenshots/`。APIキー不要） |
 
 ## 評価とベンチマーク
 
@@ -219,6 +235,12 @@ eval/
   run.ts               評価ランナー（npm run eval / eval:live）
 tests/
   safety.test.ts       決定的ロジックのユニットテスト14件（APIキー不要）
+scripts/
+  screenshot.mjs       UIスクショの撮影（npm run shots）。手撮りだと解像度と手順がぶれるため固定
+docs/
+  screenshots/         READMEと発表資料用の画像。UIを変えたら撮り直す
+  BENCHMARK.md         評価結果（npm run eval:report で再生成）
+  THEME.md             テーマとの接続
 lib/
   prompts.ts           共通プロンプト制約（TONE_RULE等）・入力の無害化
   api-guard.ts         APIの入口ガード（Content-Type強制・サイズ制限・レート制限）
