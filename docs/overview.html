@@ -236,6 +236,10 @@ figcaption { font-size: 13px; color: var(--muted); line-height: 1.7; }
 .pill.wait { background: var(--caution-soft); color: var(--caution); }
 .pill.no { background: var(--stamp-soft); color: var(--stamp); }
 .scroll { overflow-x: auto; border: 1px solid var(--rule); }
+.fixes { min-width: 640px; }
+.fixes td { font-size: 13.5px; line-height: 1.75; color: var(--ink-2); }
+.fixes td b { color: var(--ink); display: block; margin-bottom: 2px; }
+.fixes td:first-child { width: 48%; }
 
 /* ── 7: 安全・倫理 ─────────────────── */
 .rules { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
@@ -337,6 +341,7 @@ figcaption { font-size: 13px; color: var(--muted); line-height: 1.7; }
         <li><a href="#safety">安全と倫理</a></li>
         <li><a href="#process">テーマの選び方</a></li>
         <li><a href="#stack">技術スタック</a></li>
+        <li><a href="#fixes">レビューで直したこと</a></li>
       </ol>
     </nav>
 
@@ -479,7 +484,7 @@ figcaption { font-size: 13px; color: var(--muted); line-height: 1.7; }
           <div class="step final">
             <span class="m">STEP 3</span>
             <span class="t">安全弁で最終判定</span>
-            <span class="s">訳し戻しで気持ちの向きの保存度が20以下なら、ペルソナが緩く判定していても警告に引き上げる。</span>
+            <span class="s">訳し戻しで「気持ちの向き」か「否定の構造」の保存度が20以下なら赤（炎上リスク）、気持ちの向きが55以下なら黄に、ペルソナの判定より厳しい側へだけ引き上げる。</span>
           </div>
         </div>
 
@@ -572,7 +577,7 @@ figcaption { font-size: 13px; color: var(--muted); line-height: 1.7; }
             <tbody>
               <tr><td>単語一致の方法は大半を見逃す</td><td><span class="pill ok">実測済み</span></td><td><code>npm run eval</code>（APIキー不要）</td></tr>
               <tr><td>ルールだけでは手がかりがゼロのケースがある</td><td><span class="pill ok">実測済み</span></td><td>同上</td></tr>
-              <tr><td>失敗時に安全側へ倒れる仕組みが動く</td><td><span class="pill ok">テスト済み</span></td><td><code>npm test</code>（14件）</td></tr>
+              <tr><td>失敗時に安全側へ倒れる仕組みが動く</td><td><span class="pill ok">テスト済み</span></td><td><code>npm test</code>（17件）</td></tr>
               <tr><td>実際のAIが比較手法を上回る</td><td><span class="pill wait">未計測</span></td><td><code>npm run eval:live</code></td></tr>
               <tr><td>実際のファンに役立つ</td><td><span class="pill no">未検証</span></td><td>ユーザーテスト未実施</td></tr>
             </tbody>
@@ -609,7 +614,7 @@ figcaption { font-size: 13px; color: var(--muted); line-height: 1.7; }
           </div>
         </div>
         <p>制御文字の除去では、絵文字をつなぐ特殊文字（ZWJ）だけは残しています。消すと 💀 などの絵文字が壊れ、絵文字の読み取りが核心であるこの製品では致命的になるためです。</p>
-        <p>また、AIが題材の過激さを理由に回答を拒否して止まる事態に備え、①「分類が目的で生成はしない」と明示する、②拒否されたら別ベンダーのモデルへ自動で切り替える、③それでもだめなら4文化を1つずつ分けて再試行する、という3段の備えを入れています。</p>
+        <p>また、AIが題材の過激さを理由に回答を拒否して止まる事態に備え、①「分類が目的で生成はしない」と明示する、②障害や拒否のときは別ベンダーのモデルへ自動で切り替える（OpenRouter の機能）、③それでもだめなら4文化を1つずつ分けて再試行する、という3段の備えを入れています。最後まで拒否された場合は「表現を変えてお試しください」と案内します。</p>
       </section>
 
       <!-- 8 -->
@@ -650,7 +655,7 @@ figcaption { font-size: 13px; color: var(--muted); line-height: 1.7; }
           <div><span class="k">AI GATEWAY</span><span class="v">OpenRouter</span><span class="w">1つのAPIキーでClaude・Gemini・GPTを切り替え可能</span></div>
           <div><span class="k">VALIDATION</span><span class="v">Zod 4</span><span class="w">AIの回答を決まった形式（JSON）で受け取り、崩れたら弾く</span></div>
           <div><span class="k">HOSTING</span><span class="v">Vercel</span><span class="w">mainへのpushで自動デプロイ。キー未設定でもデモで動く</span></div>
-          <div><span class="k">QUALITY</span><span class="v">node:test ／ 評価基盤 ／ Playwright</span><span class="w">安全ロジックのテスト14件、ベンチマーク、画面写真の自動撮影</span></div>
+          <div><span class="k">QUALITY</span><span class="v">node:test ／ 評価基盤 ／ Playwright</span><span class="w">安全ロジックのテスト17件、ベンチマーク、画面写真の自動撮影</span></div>
         </div>
         <p>処理ごとに向いたモデルを使い分けています。判定の核には高性能なモデルを、毎回並行して走る機械的な処理には安価で速いモデルを割り当て、環境変数だけで差し替えられます。</p>
         <div class="scroll">
@@ -666,6 +671,46 @@ figcaption { font-size: 13px; color: var(--muted); line-height: 1.7; }
         <div class="prose">
           <p><strong>既知の制約。</strong>用語集は35語、文化規範カードは4文化×12項目の初期版です。入国審査の作品データは、実在サイトのデータを規約上収集できないため、言語ごとのタグ文化の違いを再現した架空作品12件で構成しています。APIキーがない場合はデモモードになり、用意した例文（出国4例、入国1例）だけを判定します。</p>
         </div>
+      </section>
+      <!-- 10 -->
+      <section id="fixes">
+        <div class="sec-label"><span class="no">10</span><span>CODE REVIEW</span></div>
+        <h2>コードレビューで見つけて直したこと</h2>
+        <p>この資料を作る際にコード全体を読み直し、設計の意図どおりに動いていなかった箇所を5つ修正しました。機能や画面は変えていません。どれも数行の修正で、修正前に失敗し修正後に通るテストを3件追加しています（テストは14件から17件に）。</p>
+        <div class="scroll">
+          <table class="status fixes">
+            <thead><tr><th>何が起きていたか</th><th>直した内容</th><th>影響</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>AIが回答を拒否したとき、理由の分からないエラーになっていた。</b>4文化を分けて再試行しても全部拒否された場合、拒否だという情報が汎用エラーに包まれ、用意していた「表現を変えてお試しください」の案内に届いていなかった</td>
+                <td>全部が拒否で終わったときは、拒否エラーのまま返すようにした</td>
+                <td><span class="pill no">利用者向け</span></td>
+              </tr>
+              <tr>
+                <td><b>一部の文化圏で訳し戻しの採点が欠けると、根拠のない「炎上リスク」を出していた。</b>欠けた採点を0点で埋めていたため、安全弁が「気持ちの向きの保存度 0」という測っていない値を理由に赤判定へ引き上げていた</td>
+                <td>欠けた文化圏は採点なしとして扱い、ペルソナ判定をそのまま使う。訳し戻し全体が失敗したときの扱いと揃えた</td>
+                <td><span class="pill no">利用者向け</span></td>
+              </tr>
+              <tr>
+                <td><b>予備モデルへの切り替え指定から主モデルが抜けていた。</b>OpenRouter の <code>models</code> は「優先順に試すモデルの一覧」だが、予備の2つだけを渡していた</td>
+                <td>主モデルを一覧の先頭に入れ、公式ドキュメントの例と同じ形にした</td>
+                <td><span class="pill wait">要実機確認</span></td>
+              </tr>
+              <tr>
+                <td><b>レート制限の記録が溢れたとき、連打中の相手の制限が解除されることがあった。</b>「最も古いキーから捨てる」つもりが、JavaScript の Map は上書きしても順番が変わらないため、アクセスし続けている相手が最古扱いのまま残っていた</td>
+                <td>記録するたびにキーを末尾へ移し、本当に使われていないものから捨てるようにした</td>
+                <td><span class="pill ok">防御の強化</span></td>
+              </tr>
+              <tr>
+                <td><b>本文サイズの上限が「バイト」ではなく「文字数」で測られていた。</b>日本語は1文字3バイトのため、実際には上限の約3倍まで通っていた</td>
+                <td>UTF-8 のバイト数で測るようにした</td>
+                <td><span class="pill ok">防御の強化</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>あわせて README の記述のずれを1か所直しました。「判定できなかった文化圏は緑（安全）で埋める」と書かれていましたが、実際のコードは黄（未検査）で埋めており、コードの方が設計方針（検査に失敗したら安全と答えない）に沿っていました。</p>
+        <p style="font-size:13px;color:var(--muted)">「要実機確認」の項目は、OpenRouter の公式ドキュメントの例に合わせた修正です。この環境からは OpenRouter に接続できず、実際のAPIでの動作はまだ確かめていません。APIキーを設定して <code>npm run eval:live</code> を実行すると確認できます。</p>
       </section>
     </main>
   </div>

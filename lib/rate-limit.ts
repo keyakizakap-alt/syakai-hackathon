@@ -2,7 +2,7 @@
  * IPごとのスライディングウィンドウ・レート制限。
  *
  * このアプリのAPIは認証なしで公開され、1リクエストごとに有料のLLM APIを
- * 最大5回（panel統合1回＋gate1回、縮退時はpanelが4回に分割）呼び出す。
+ * 最大6回（panel統合1回＋gate1回、統合が失敗した縮退時はさらにpanelを4回に分割）呼び出す。
  * 制限が無いと、第三者が連打するだけでAPIキーの残高を焼き切れてしまう
  * （可用性の問題であると同時に金銭的な被害になる）。
  *
@@ -47,6 +47,16 @@ export function clientKeyOf(req: Request): string {
 }
 
 /**
+ * キーを Map の末尾（最新）へ移して記録する。Map.set は既存キーの挿入順を変えないため、
+ * 一度消してから入れ直さないと、アクセスし続けているキーが「最も古い」扱いのまま
+ * 先頭に残り、上限超過時に真っ先に捨てられて制限がリセットされてしまう。
+ */
+function touch(key: string, win: Window): void {
+  windows.delete(key);
+  windows.set(key, win);
+}
+
+/**
  * 指定キーが windowMs の間に limit 回まで、を満たすか判定し、
  * 満たす場合はこの呼び出しを1回分として記録する。
  */
@@ -66,12 +76,12 @@ export function checkRateLimit(
     // 最も古い記録がウィンドウから外れるまで待てば1枠空く
     const oldest = hits[0];
     const retryAfterSec = Math.max(1, Math.ceil((oldest + windowMs - now) / 1000));
-    windows.set(key, { hits });
+    touch(key, { hits });
     return { ok: false, retryAfterSec };
   }
 
   hits.push(now);
-  windows.set(key, { hits });
+  touch(key, { hits });
 
   // Map の肥大化を防ぐ。Map は挿入順を保つので先頭が最も古い
   if (windows.size > MAX_TRACKED_KEYS) {

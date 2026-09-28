@@ -199,7 +199,7 @@ cp .env.example .env.local   # OPENROUTER_API_KEY を設定
 |---|---|
 | 文字列一致ベースラインが大半を取りこぼす | **実測済み**（`npm run eval`） |
 | 辞書ベースでは手がかりがゼロのケースがある | **実測済み**（同上） |
-| フェイルセーフ（安全側の既定値）が機能する | **テスト済み**（`npm test` 14件） |
+| フェイルセーフ（安全側の既定値）が機能する | **テスト済み**（`npm test` 17件） |
 | 実モデルがベースラインを上回る | **未計測**（キー設定後 `npm run eval:live` で1コマンド） |
 | 実運用のファンに効果がある | **未検証**（ユーザーテスト未実施） |
 
@@ -234,7 +234,7 @@ eval/
   score.ts             採点ロジック（純関数）
   run.ts               評価ランナー（npm run eval / eval:live）
 tests/
-  safety.test.ts       決定的ロジックのユニットテスト14件（APIキー不要）
+  safety.test.ts       決定的ロジックのユニットテスト17件（APIキー不要）
 scripts/
   screenshot.mjs       UIスクショの撮影（npm run shots）。手撮りだと解像度と手順がぶれるため固定
 docs/
@@ -300,7 +300,7 @@ panel と並列/毎回実行される機械的な処理のため、安価なモ�
    まとめた1リクエストから、4文化個別の4リクエストに分割して再試行する
    （[`lib/analyze.ts`](./lib/analyze.ts)の`runPanelSplit`）。通常は発火せず、
    比較読みができる統合リクエストの価値を優先する。個別の文化判定がさらに失敗した
-   場合は、その文化だけ安全側の既定値（green・トリガー無し）で埋める。
+   場合は、その文化だけ「未検査」と明記した yellow で埋める（green にはしない。詳細は「フェイルオープンさせない」節）。
 
 `complete()`（[`lib/dispatch.ts`](./lib/dispatch.ts)）が全処理の呼び出し口を一箇所に
 集約している。`hasCredentialsFor(task)`が`OPENROUTER_API_KEY`の有無を見てデモ/liveを

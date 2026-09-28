@@ -50,7 +50,7 @@ export function guardRequest(req: Request): NextResponse | null {
 
 /**
  * 本文をJSONとして読む。Content-Length を持たないチャンク転送でも
- * 上限を超えないよう、読み出したバイト数でも打ち切る。
+ * 上限を超えた本文をパースしないよう、読み出した後のバイト数でも確認する。
  */
 export async function readJsonBody(req: Request): Promise<{ body: unknown } | { error: NextResponse }> {
   let raw: string;
@@ -60,7 +60,8 @@ export async function readJsonBody(req: Request): Promise<{ body: unknown } | { 
     return { error: NextResponse.json({ error: "リクエストボディを読み取れません" }, { status: 400 }) };
   }
 
-  if (raw.length > MAX_BODY_BYTES) {
+  // raw.length は UTF-16 の文字数でありバイト数ではない（日本語は1文字3バイト）
+  if (Buffer.byteLength(raw, "utf8") > MAX_BODY_BYTES) {
     return { error: NextResponse.json({ error: "リクエストボディが大きすぎます" }, { status: 413 }) };
   }
 

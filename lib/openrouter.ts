@@ -42,7 +42,9 @@ export async function runOpenRouter<T>(args: {
   };
   const body: OpenRouterExtra = {
     model: args.model,
-    ...(args.fallbackModels && { models: args.fallbackModels }),
+    // OpenRouter の models は「優先順に試すモデルの一覧」なので、主モデルを先頭に含める。
+    // フォールバック候補だけを渡すと、主モデルが一度も試されない可能性がある。
+    ...(args.fallbackModels?.length ? { models: [args.model, ...args.fallbackModels] } : {}),
     messages: [
       { role: "system", content: args.system },
       { role: "user", content: args.user },
