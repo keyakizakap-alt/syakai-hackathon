@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 
+import { AgentConsole } from "@/components/agent/AgentConsole";
+import { useAgentRun } from "@/components/agent/useAgentRun";
+import { CopyButton } from "@/components/CopyButton";
 import { CultureCard } from "@/components/CultureCard";
 import { PromptBox } from "@/components/PromptBox";
 import { RiskRadar } from "@/components/RiskRadar";
 import { PRESETS } from "@/lib/demo";
 import { riskLabel, worstCulture } from "@/lib/summary";
-import type { CheckResult, Verdict } from "@/lib/types";
+import type { Verdict } from "@/lib/types";
 
 const MAX_CHARS = 600;
 
@@ -17,56 +20,18 @@ const OVERALL: Record<Verdict, { dot: string; label: string; cls: string }> = {
   red: { dot: "🔴", label: "炎上リスクあり", cls: "text-(--color-red) border-(--color-red)/40 bg-(--color-red)/8" },
 };
 
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        } catch {
-          // clipboard 権限がない環境ではボタンを無反応にするだけに留める
-        }
-      }}
-      className="shrink-0 rounded-md border border-(--color-line) bg-(--color-ink) px-2 py-1 text-[11px] text-(--color-muted) transition hover:text-(--color-fg)"
-    >
-      {copied ? "コピーしました" : "コピー"}
-    </button>
-  );
-}
-
 export function CheckPanel() {
   const [text, setText] = useState("");
-  const [result, setResult] = useState<CheckResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  // 通信と進捗の畳み込みは hook に任せる。実行中の様子は AgentConsole が見せる
+  const { state, run } = useAgentRun();
+  const result = state.result ?? null;
+  const loading = state.phase === "running";
+  const error = state.phase === "error" ? (state.error?.message ?? "解析に失敗しました") : null;
 
-  async function check(value: string) {
+  function check(value: string) {
     const body = value.trim();
     if (!body || loading) return;
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    try {
-      const res = await fetch("/api/check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: body }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "解析に失敗しました");
-        return;
-      }
-      setResult(data as CheckResult);
-    } catch {
-      setError("サーバーに接続できませんでした");
-    } finally {
-      setLoading(false);
-    }
+    void run(body);
   }
 
   const over = result ? OVERALL[result.overall] : null;
@@ -84,21 +49,27 @@ export function CheckPanel() {
         は英語圏で脅迫として着弾しうる。投稿する前に、それを本人にだけ返します。
       </p>
 
-      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
-        <PromptBox
-          presets={PRESETS}
-          value={text}
-          onChange={setText}
-          onSubmit={check}
-          loading={loading}
-          maxChars={MAX_CHARS}
-          placeholder="海外に出す前の一文を貼り付けてください（上のプリセットからも試せます）"
-          submitLabel="世界に出す前に検める"
-          loadingLabel="審査中…"
-          stale={Boolean(result) && text.trim() !== result?.input}
-        />
+      {/* 入力＝左1行目、結果＝右で2行分、エージェント＝左2行目。
+          下の行を 1fr にするのは、右の結果が縦に長いとき、余白が入力とエージェントの間ではなく
+          エージェントの下に出るようにするため（行をまたぐ要素の超過分は 1fr の行が吸収する）。
+          DOM 順は 入力→結果→エージェント なので、モバイルでは結果の直後にエージェントが出る。 */}
+      <div className="grid gap-5 lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:items-start">
+        <div className="lg:col-start-1 lg:row-start-1">
+          <PromptBox
+            presets={PRESETS}
+            value={text}
+            onChange={setText}
+            onSubmit={check}
+            loading={loading}
+            maxChars={MAX_CHARS}
+            placeholder="海外に出す前の一文を貼り付けてください（上のプリセットからも試せます）"
+            submitLabel="世界に出す前に検める"
+            loadingLabel="審査中…"
+            stale={Boolean(result) && text.trim() !== result?.input}
+          />
+        </div>
 
-        <section className="rise flex min-h-64 flex-col rounded-xl border border-(--color-line) bg-(--color-panel) p-5">
+        <section className="rise flex flex-col rounded-xl border border-(--color-line) bg-(--color-panel) p-5 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:min-h-64">
           {!result && !loading && !error && (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
               <span aria-hidden className="text-2xl opacity-40">
@@ -186,6 +157,10 @@ export function CheckPanel() {
             </div>
           )}
         </section>
+
+        {/* 入力欄の下の空き領域。エージェントの作業を見せる。添え書きや言い換え案は入力欄へ反映するだけで、
+            再検査は人が押す（人が承認するループ）。 */}
+        <AgentConsole state={state} onApply={setText} className="lg:col-start-1 lg:row-start-2" />
       </div>
 
       {result && (

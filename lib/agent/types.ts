@@ -27,7 +27,7 @@ export interface StepMeta {
   label: string;
   /** 待機中に見せる、その手順が何をするかの説明（手順がそのまま製品の説明になる） */
   caption: string;
-  /** この手順が呼ぶツール。画面のチップに出す */
+  /** この手順が呼ぶツール。画面のチップに出す。ツールを呼ばない手順は空 */
   tool: string;
 }
 
@@ -37,7 +37,7 @@ export const STEPS: Record<StepId, StepMeta> = {
   diagnose: { no: "③", label: "診断", caption: "規範カードに照らして摩擦を分類", tool: "norms" },
   prescribe: { no: "④", label: "処方", caption: "添え書き or 選択肢を用意", tool: "friction" },
   verify: { no: "⑤", label: "検証", caption: "修正案で読み直し Before/After を測る", tool: "verify" },
-  report: { no: "⑥", label: "報告", caption: "線引きは人に委ねて停止", tool: "—" },
+  report: { no: "⑥", label: "報告", caption: "線引きは人に委ねて停止", tool: "" },
 };
 
 /** 自己検証した修正案の種類。言い方なら添え書き付きの投稿、線引きなら言い換え案 */
