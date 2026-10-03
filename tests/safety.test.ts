@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { test, describe } from "node:test";
 
 import { __testing } from "../lib/analyze";
+import { RefusalError } from "../lib/errors";
 import { sanitizeForPrompt } from "../lib/prompts";
 import { checkRateLimit, __resetRateLimit } from "../lib/rate-limit";
 import { CULTURE_IDS, type BackTranslation, type CultureReading } from "../lib/types";
 
-const { applyGate, overallOf, unjudgedCultureReading } = __testing;
+const { applyGate, overallOf, unjudgedCultureReading, panelSplitFailure } = __testing;
 
 function reading(over: Partial<CultureReading> = {}): CultureReading {
   return {
@@ -136,5 +137,34 @@ describe("レート制限", () => {
     __resetRateLimit();
     assert.equal(checkRateLimit("a", 1, 60_000).ok, true);
     assert.equal(checkRateLimit("b", 1, 60_000).ok, true, "別IPが巻き添えで止まってはいけない");
+  });
+});
+
+describe("縮退運転が全滅したときのエラー", () => {
+  test("全文化が拒否で落ちたら RefusalError のまま投げる（APIが422を返せるように）", () => {
+    const err = panelSplitFailure([1, 2, 3, 4].map(() => new RefusalError("openrouter", "m")));
+    assert.ok(err instanceof RefusalError);
+  });
+
+  test("拒否以外の失敗が混ざれば汎用エラーにする", () => {
+    const err = panelSplitFailure([new RefusalError("openrouter", "m"), new Error("timeout")]);
+    assert.ok(!(err instanceof RefusalError));
+  });
+});
+
+describe("レート制限：追跡キーの上限", () => {
+  test("アクセスし続けているキーは、上限超過時に先に捨てられない", () => {
+    __resetRateLimit();
+    const t0 = 2_000_000;
+    // 制限に達したキーを作る
+    checkRateLimit("active", 1, 60_000, t0);
+    // 上限（10,000キー）ぎりぎりまで別キーを埋め、途中で active を再度叩く
+    for (let i = 0; i < 9_999; i++) {
+      if (i === 5_000) assert.equal(checkRateLimit("active", 1, 60_000, t0 + 1).ok, false);
+      checkRateLimit(`k${i}`, 1, 60_000, t0 + 2);
+    }
+    // 1キー追加で最古のキーが捨てられる。active はまだ制限中のままであるべき
+    checkRateLimit("overflow", 1, 60_000, t0 + 3);
+    assert.equal(checkRateLimit("active", 1, 60_000, t0 + 4).ok, false, "制限中のキーがリセットされた");
   });
 });

@@ -1,0 +1,722 @@
+<title>ニュアンス税関 解説書</title>
+<meta name="description" content="ニュアンス税関（Nuance Customs）が何を解決し、どんな技術でどう作ったかを、前提知識なしで読めるようにまとめた解説資料">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --paper: #eef1f3;
+  --sheet: #fbfcfc;
+  --ink: #16233a;
+  --ink-2: #44506a;
+  --muted: #6c768c;
+  --rule: #cfd5de;
+  --rule-strong: #9aa4b5;
+  --stamp: #c3313f;
+  --stamp-soft: #f6dfe1;
+  --pass: #1f7a5c;
+  --pass-soft: #dcefe7;
+  --caution: #a46a0c;
+  --caution-soft: #f5ead3;
+  --navy-band: #16233a;
+  --on-band: #eef1f3;
+  --code-bg: #e4e8ed;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #0f1522;
+    --sheet: #151d2d;
+    --ink: #e6eaf1;
+    --ink-2: #b7bfcd;
+    --muted: #8993a6;
+    --rule: #28334a;
+    --rule-strong: #46526b;
+    --stamp: #ef6b77;
+    --stamp-soft: #3a1e26;
+    --pass: #4fc39a;
+    --pass-soft: #15332b;
+    --caution: #e0a948;
+    --caution-soft: #362a14;
+    --navy-band: #0a0f19;
+    --on-band: #e6eaf1;
+    --code-bg: #1d2638;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0f1522;
+  --sheet: #151d2d;
+  --ink: #e6eaf1;
+  --ink-2: #b7bfcd;
+  --muted: #8993a6;
+  --rule: #28334a;
+  --rule-strong: #46526b;
+  --stamp: #ef6b77;
+  --stamp-soft: #3a1e26;
+  --pass: #4fc39a;
+  --pass-soft: #15332b;
+  --caution: #e0a948;
+  --caution-soft: #362a14;
+  --navy-band: #0a0f19;
+  --on-band: #e6eaf1;
+  --code-bg: #1d2638;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.85;
+  padding-inline: 16px;
+  padding-block: 0 64px;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1080px; margin: 0 auto; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+p { margin: 0; }
+code, .mono { font-family: var(--mono); font-size: .88em; }
+code { background: var(--code-bg); padding: .1em .4em; border-radius: 3px; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--stamp); outline-offset: 2px; }
+
+/* ── Header: 税関申告書の書式 ─────────────────── */
+.form-head {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px;
+  font-family: var(--mono); font-size: 12px; letter-spacing: .08em; color: var(--muted);
+  border-bottom: 1px solid var(--rule-strong);
+  padding-block: 20px 10px;
+  text-transform: uppercase;
+}
+.hero {
+  display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: end;
+  padding-block: 48px 40px;
+  border-bottom: 3px double var(--rule-strong);
+}
+.hero .kicker { font-size: 14px; color: var(--ink-2); letter-spacing: .06em; margin-bottom: 14px; }
+.hero h1 { font-family: var(--display); font-weight: 400; font-size: clamp(40px, 8vw, 84px); line-height: 1.08; letter-spacing: .01em; }
+.hero h1 small { display: block; font-family: var(--mono); font-size: 14px; letter-spacing: .3em; color: var(--muted); margin-top: 10px; }
+.hero .lede { margin-top: 24px; font-size: clamp(17px, 2.2vw, 20px); line-height: 1.8; max-width: 34em; }
+.hero .lede strong { background: linear-gradient(transparent 62%, var(--stamp-soft) 62%); }
+.stamp {
+  font-family: var(--display); color: var(--stamp);
+  border: 3px solid var(--stamp); border-radius: 6px;
+  padding: 10px 16px 8px; text-align: center; line-height: 1.2;
+  transform: rotate(-8deg); opacity: .9;
+  box-shadow: inset 0 0 0 2px var(--sheet), inset 0 0 0 4px var(--stamp);
+}
+.stamp b { display: block; font-weight: 400; font-size: 30px; letter-spacing: .1em; }
+.stamp span { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; margin-top: 4px; }
+
+/* ── Layout: 目次 + 本文 ─────────────────── */
+.layout { display: grid; grid-template-columns: 200px 1fr; gap: 48px; padding-top: 40px; }
+.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 13px; }
+.toc p { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--muted); margin-bottom: 10px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: t; }
+.toc li { counter-increment: t; }
+.toc a { display: grid; grid-template-columns: 28px 1fr; text-decoration: none; color: var(--ink-2); padding: 4px 0; }
+.toc a::before { content: counter(t, decimal-leading-zero); font-family: var(--mono); color: var(--muted); }
+.toc a:hover { color: var(--stamp); }
+
+main { min-width: 0; display: grid; gap: 72px; }
+section { display: grid; gap: 22px; scroll-margin-top: 24px; }
+.sec-label {
+  display: flex; align-items: baseline; gap: 12px;
+  font-family: var(--mono); font-size: 12px; letter-spacing: .14em; color: var(--muted);
+  border-top: 1px solid var(--ink); padding-top: 10px;
+}
+.sec-label .no { color: var(--stamp); font-weight: 500; }
+section h2 { font-family: var(--display); font-weight: 400; font-size: clamp(24px, 3.6vw, 34px); line-height: 1.35; }
+section > p, .prose p { max-width: 38em; color: var(--ink-2); }
+.prose { display: grid; gap: 14px; }
+strong { color: var(--ink); }
+
+/* ── 1: 一言でいうと ─────────────────── */
+.answer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+.answer-grid > div { background: var(--sheet); padding: 20px 20px 22px; display: grid; gap: 8px; align-content: start; }
+.answer-grid .q { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--muted); }
+.answer-grid .a { font-weight: 700; font-size: 17px; line-height: 1.6; }
+.answer-grid .d { font-size: 14px; color: var(--ink-2); line-height: 1.75; }
+
+/* ── 2: 翻訳の事故 ─────────────────── */
+.mistrans { display: grid; gap: 12px; }
+.mt-row {
+  display: grid; grid-template-columns: 1fr 28px 1fr 28px 1.1fr; align-items: center; gap: 8px;
+  background: var(--sheet); border: 1px solid var(--rule); padding: 16px 18px;
+}
+.mt-row .arrow { text-align: center; color: var(--muted); font-family: var(--mono); }
+.mt-cell .tag { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; color: var(--muted); display: block; margin-bottom: 2px; }
+.mt-cell .txt { font-size: 16px; font-weight: 700; }
+.mt-cell.en .txt { font-family: var(--mono); font-weight: 500; font-size: 14.5px; }
+.mt-cell.out .txt { color: var(--stamp); }
+.mt-cell.intent .txt { color: var(--pass); }
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ── 3: 2つの審査 ─────────────────── */
+.gates { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.gate { background: var(--sheet); border: 1px solid var(--rule); display: grid; grid-template-rows: auto auto 1fr; }
+.gate-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 16px 20px; border-bottom: 1px dashed var(--rule-strong); }
+.gate-head h3 { font-family: var(--display); font-weight: 400; font-size: 24px; }
+.gate-head .dir { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: var(--muted); }
+.gate-body { padding: 16px 20px 20px; display: grid; gap: 10px; font-size: 15px; color: var(--ink-2); }
+.gate-body dl { margin: 0; display: grid; grid-template-columns: 5.5em 1fr; gap: 6px 12px; font-size: 14px; }
+.gate-body dt { color: var(--muted); }
+.gate-body dd { margin: 0; color: var(--ink); }
+figure { margin: 0; display: grid; gap: 8px; }
+.gate figure { padding: 0 20px 20px; align-self: end; }
+figure img { width: 100%; height: auto; display: block; border: 1px solid var(--rule); }
+figcaption { font-size: 13px; color: var(--muted); line-height: 1.7; }
+
+.verdict-demo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.culture { background: var(--sheet); border: 1px solid var(--rule); padding: 14px 14px 12px; display: grid; gap: 6px; }
+.culture .name { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.culture .score { font-family: var(--mono); font-size: 34px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+.culture .bar { height: 6px; background: var(--code-bg); position: relative; }
+.culture .bar i { position: absolute; inset: 0 auto 0 0; }
+.culture.g .score { color: var(--pass); } .culture.g .bar i { background: var(--pass); }
+.culture.y .score { color: var(--caution); } .culture.y .bar i { background: var(--caution); }
+.culture.r .score { color: var(--stamp); } .culture.r .bar i { background: var(--stamp); }
+.culture.r { border-color: var(--stamp); }
+
+/* ── 4: 仕組み ─────────────────── */
+.flow { display: grid; grid-template-columns: 1fr 24px 1.6fr 24px 1fr; align-items: stretch; gap: 8px; }
+.flow .step { background: var(--sheet); border: 1px solid var(--rule); padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.flow .step .t { font-weight: 700; font-size: 15px; }
+.flow .step .s { font-size: 13px; color: var(--ink-2); line-height: 1.7; }
+.flow .step .m { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.flow .join { display: grid; place-items: center; color: var(--rule-strong); font-family: var(--mono); }
+.flow .par { display: grid; gap: 8px; }
+.flow .final { border-color: var(--ink); }
+.flow .step.key { border-left: 3px solid var(--stamp); }
+
+.mech { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+.mech > div { background: var(--sheet); padding: 18px 20px; display: grid; gap: 6px; align-content: start; }
+.mech h3 { font-size: 16px; }
+.mech p { font-size: 14px; color: var(--ink-2); line-height: 1.8; }
+.mech .file { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+
+/* ── 5: AIが必要な理由 ─────────────────── */
+.nomatch { background: var(--sheet); border: 1px solid var(--rule); padding: 22px; display: grid; grid-template-columns: 1fr auto 1.4fr; gap: 20px; align-items: center; }
+.nomatch .side .lab { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: var(--muted); margin-bottom: 8px; }
+.nomatch .decl { font-size: 20px; font-weight: 700; }
+.nomatch .terms { display: flex; flex-wrap: wrap; gap: 8px; }
+.term { font-size: 16px; font-weight: 700; padding: 4px 10px; border: 1px solid var(--rule-strong); background: var(--paper); }
+.nomatch .x { font-family: var(--display); color: var(--stamp); font-size: 22px; text-align: center; line-height: 1.3; }
+.nomatch .x small { display: block; font-family: var(--body); font-size: 12px; color: var(--muted); }
+
+/* ── 6: 検証結果 ─────────────────── */
+.bench { background: var(--sheet); border: 1px solid var(--rule); padding: 22px 22px 18px; display: grid; gap: 18px; }
+.bench h3 { font-size: 15px; }
+.bench .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--ink-2); }
+.bench .legend i { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 6px; }
+.brow { display: grid; grid-template-columns: 13em 1fr; gap: 6px 16px; align-items: center; }
+.brow .who { font-size: 14px; line-height: 1.5; }
+.brow .who small { display: block; color: var(--muted); font-size: 12px; }
+.bars { display: grid; gap: 5px; }
+.bline { display: grid; grid-template-columns: 1fr 4.2em; gap: 10px; align-items: center; }
+.track { height: 16px; background: var(--code-bg); position: relative; }
+.track i { position: absolute; inset: 0 auto 0 0; }
+.bline .v { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
+.fn { background: var(--stamp); } .ob { background: var(--caution); }
+.axis { display: grid; grid-template-columns: 13em 1fr; gap: 16px; }
+.axis .ticks { display: grid; grid-template-columns: 1fr 4.2em; gap: 10px; }
+.axis .ticks div:first-child { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.pending { font-size: 14px; color: var(--ink-2); border-top: 1px dashed var(--rule-strong); padding-top: 14px; }
+
+.status { width: 100%; border-collapse: collapse; font-size: 14.5px; background: var(--sheet); }
+.status th, .status td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.status th { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: var(--muted); font-weight: 400; border-bottom: 1px solid var(--ink); }
+.pill { display: inline-block; font-size: 12.5px; font-weight: 700; padding: 1px 10px; border-radius: 999px; white-space: nowrap; }
+.pill.ok { background: var(--pass-soft); color: var(--pass); }
+.pill.wait { background: var(--caution-soft); color: var(--caution); }
+.pill.no { background: var(--stamp-soft); color: var(--stamp); }
+.scroll { overflow-x: auto; border: 1px solid var(--rule); }
+.fixes { min-width: 640px; }
+.fixes td { font-size: 13.5px; line-height: 1.75; color: var(--ink-2); }
+.fixes td b { color: var(--ink); display: block; margin-bottom: 2px; }
+.fixes td:first-child { width: 48%; }
+
+/* ── 7: 安全・倫理 ─────────────────── */
+.rules { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.rulebox { background: var(--sheet); border: 1px solid var(--rule); padding: 20px; display: grid; gap: 12px; align-content: start; }
+.rulebox h3 { font-size: 17px; }
+.rulebox ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.rulebox li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; font-size: 14.5px; color: var(--ink-2); line-height: 1.75; }
+.rulebox li::before { content: "✓"; color: var(--pass); font-weight: 700; }
+.rulebox li b { color: var(--ink); }
+.callout { background: var(--navy-band); color: var(--on-band); padding: 22px 24px; display: grid; gap: 8px; }
+.callout .lab { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; opacity: .7; }
+.callout p { font-size: 17px; line-height: 1.8; }
+
+/* ── 8: 作り方 ─────────────────── */
+.funnel { display: grid; gap: 8px; }
+.fstep { display: grid; grid-template-columns: 4.5em 1fr; gap: 16px; align-items: center; background: var(--sheet); border: 1px solid var(--rule); padding: 14px 18px; }
+.fstep .n { font-family: var(--display); font-size: 26px; line-height: 1; color: var(--ink); text-align: right; }
+.fstep .n small { font-family: var(--body); font-size: 12px; color: var(--muted); }
+.fstep .t { font-size: 15px; font-weight: 700; }
+.fstep .s { font-size: 13.5px; color: var(--ink-2); line-height: 1.7; }
+.fstep.win { border-color: var(--stamp); }
+.fstep.win .n { color: var(--stamp); }
+.twogate { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--sheet); }
+.twogate th, .twogate td { padding: 10px 14px; border-bottom: 1px solid var(--rule); text-align: left; }
+.twogate th { font-weight: 400; color: var(--muted); font-size: 12.5px; border-bottom: 1px solid var(--ink); }
+.twogate tr.win td { font-weight: 700; background: var(--stamp-soft); }
+.ok-mark { color: var(--pass); font-weight: 700; }
+.ng-mark { color: var(--stamp); font-weight: 700; }
+
+/* ── 9: 技術スタック ─────────────────── */
+.stack { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+.stack > div { background: var(--sheet); padding: 16px 18px; display: grid; gap: 4px; align-content: start; }
+.stack .k { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: var(--muted); }
+.stack .v { font-weight: 700; font-size: 15px; }
+.stack .w { font-size: 13px; color: var(--ink-2); line-height: 1.7; }
+.models { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--sheet); }
+.models th, .models td { padding: 10px 14px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+.models th { font-weight: 400; color: var(--muted); font-size: 12.5px; border-bottom: 1px solid var(--ink); }
+.models td:first-child { font-family: var(--mono); white-space: nowrap; }
+.models td.mono { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+
+.foot { margin-top: 72px; border-top: 3px double var(--rule-strong); padding-top: 16px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; font-size: 12.5px; color: var(--muted); }
+
+/* ── Responsive ─────────────────── */
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; gap: 24px; }
+  .toc { position: static; }
+  .toc ol { grid-template-columns: repeat(2, 1fr); }
+  .gates, .rules { grid-template-columns: 1fr; }
+  .flow { grid-template-columns: 1fr; }
+  .flow .join { transform: rotate(90deg); height: 20px; }
+  .stack { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .hero { grid-template-columns: 1fr; gap: 20px; padding-block: 32px 28px; }
+  .stamp { justify-self: start; transform: rotate(-5deg); }
+  .answer-grid, .mech, .stack { grid-template-columns: 1fr; }
+  .verdict-demo { grid-template-columns: repeat(2, 1fr); }
+  .mt-row { grid-template-columns: 1fr; gap: 4px; }
+  .mt-row .arrow { transform: rotate(90deg); width: 20px; }
+  .nomatch { grid-template-columns: 1fr; }
+  .brow, .axis { grid-template-columns: 1fr; gap: 6px; }
+  .axis > div:first-child { display: none; }
+  .fstep { grid-template-columns: 3.6em 1fr; gap: 12px; }
+  main { gap: 56px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .stamp { animation: press .5s cubic-bezier(.2,.9,.3,1.3) both .2s; }
+  @keyframes press { from { transform: rotate(-8deg) scale(1.25); opacity: .35; } to { transform: rotate(-8deg) scale(1); opacity: .9; } }
+}
+</style>
+
+<div class="wrap">
+  <div class="form-head">
+    <span>Nuance Customs / 解説書</span>
+    <span>社会課題ハッカソン ｜ 推し活 × 国境</span>
+    <span>keyakizakap-alt/syakai-hackathon</span>
+  </div>
+
+  <header class="hero">
+    <div>
+      <p class="kicker">ファンの言葉が、国境で事故を起こさないように</p>
+      <h1>ニュアンス税関<small>NUANCE CUSTOMS</small></h1>
+      <p class="lede">国境を越える言葉を、<strong>出ていく前</strong>と<strong>入ってくる前</strong>の両方で検めるAIツールです。機械翻訳では伝わらない「気持ちの向き」と「注意書き」を守ります。</p>
+    </div>
+    <div class="stamp" aria-hidden="true"><b>要検査</b><span>POLARITY CHECK</span></div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="目次">
+      <p>CONTENTS</p>
+      <ol>
+        <li><a href="#summary">ひとことで</a></li>
+        <li><a href="#problem">解決する課題</a></li>
+        <li><a href="#product">作ったもの</a></li>
+        <li><a href="#how">仕組み</a></li>
+        <li><a href="#why-ai">なぜAIが必要か</a></li>
+        <li><a href="#result">検証結果</a></li>
+        <li><a href="#safety">安全と倫理</a></li>
+        <li><a href="#process">テーマの選び方</a></li>
+        <li><a href="#stack">技術スタック</a></li>
+        <li><a href="#fixes">レビューで直したこと</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <!-- 1 -->
+      <section id="summary">
+        <div class="sec-label"><span class="no">01</span><span>SUMMARY</span></div>
+        <h2>3行でいうと</h2>
+        <div class="answer-grid">
+          <div>
+            <span class="q">WHAT HAPPENS</span>
+            <span class="a">翻訳で「最高！」が「脅迫」に変わる</span>
+            <span class="d">日本のファン言葉は、機械翻訳すると意味の向きが反転することがあります。</span>
+          </div>
+          <div>
+            <span class="q">WHAT WE BUILT</span>
+            <span class="a">投稿前と閲覧前の2か所で検査する</span>
+            <span class="d">4つの文化圏でどう読まれるかを投稿前に予測し、見たくない作品は言語を問わず事前に隠します。</span>
+          </div>
+          <div>
+            <span class="q">HOW WE KNOW</span>
+            <span class="a">単語一致では88%を取りこぼすと実測</span>
+            <span class="d">既存のタグ遮断に相当する方法を再現し、意味で読まないと届かないことを数字で示しました。</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section id="problem">
+        <div class="sec-label"><span class="no">02</span><span>PROBLEM</span></div>
+        <h2>機械翻訳は「気持ちの向き」と「警告」を壊す</h2>
+        <div class="prose">
+          <p>日本のアニメや漫画は、かつてない規模で海外に届いています。ファン同士の交流も国境を越え、翻訳ツールを通して毎日やりとりされています。</p>
+          <p>ところがファンの言葉には、<strong>強い否定語で最大級の肯定を表す</strong>独特の言い回しが多くあります。「しんどい」「無理」「死んだ」は、ファンの間では「最高すぎる」という意味です。機械翻訳は単語の意味を訳すため、この逆転を拾えません。</p>
+        </div>
+        <div class="mistrans" role="list">
+          <div class="mt-row" role="listitem">
+            <div class="mt-cell"><span class="tag">書いた言葉</span><span class="txt">かわいすぎて死んだ 💀</span></div>
+            <div class="arrow">→</div>
+            <div class="mt-cell en"><span class="tag">機械翻訳</span><span class="txt">so cute I died 💀</span></div>
+            <div class="arrow">→</div>
+            <div class="mt-cell out"><span class="tag">英語圏での受け取られ方</span><span class="txt">脅迫・自傷のサイン</span></div>
+          </div>
+          <div class="mt-row" role="listitem">
+            <div class="mt-cell"><span class="tag">書いた言葉</span><span class="txt">しんどい……もう無理……</span></div>
+            <div class="arrow">→</div>
+            <div class="mt-cell en"><span class="tag">機械翻訳</span><span class="txt">I can't take it anymore</span></div>
+            <div class="arrow">→</div>
+            <div class="mt-cell out"><span class="tag">英語圏での受け取られ方</span><span class="txt">精神的な危機</span></div>
+          </div>
+          <div class="mt-row" role="listitem">
+            <div class="mt-cell"><span class="tag">書いた言葉</span><span class="txt">地雷の方はご注意</span></div>
+            <div class="arrow">→</div>
+            <div class="mt-cell en"><span class="tag">機械翻訳</span><span class="txt">Those with landmines, please be careful</span></div>
+            <div class="arrow">→</div>
+            <div class="mt-cell out"><span class="tag">英語圏での受け取られ方</span><span class="txt">意味不明。警告が消える</span></div>
+          </div>
+        </div>
+        <div class="prose">
+          <p>この結果、2種類の被害が起きます。ひとつは<strong>誤解による国際的な炎上</strong>。書いた本人は褒めたつもりなので、何が悪かったのか分かりません。もうひとつは<strong>警告が届かないことによる精神的な被害</strong>です。英語圏では作品に苦手要素の警告タグを付けるのが事実上のルールですが、日本語圏は「※」の注意書き、中国語圏は「雷点」と作法が違います。翻訳を通ると警告だけが抜け落ち、読者は避けたかった内容を踏んでしまいます。</p>
+        </div>
+      </section>
+
+      <!-- 3 -->
+      <section id="product">
+        <div class="sec-label"><span class="no">03</span><span>PRODUCT</span></div>
+        <h2>作ったもの：出国審査と入国審査</h2>
+        <p>空港の税関になぞらえ、言葉が出ていくときと入ってくるときの2か所に検査を置きました。どちらもWebアプリの1画面で、タブで切り替えて使います。</p>
+
+        <div class="gates">
+          <article class="gate">
+            <div class="gate-head"><h3>出国審査</h3><span class="dir">OUTBOUND ／ 発信前チェック</span></div>
+            <div class="gate-body">
+              <p>投稿しようとしている一文が、4つの文化圏でどう受け取られるかを投稿前に予測します。</p>
+              <dl>
+                <dt>入力</dt><dd>投稿予定の文章（600字まで）</dd>
+                <dt>出力</dt><dd>文化圏ごとの誤読リスク（0〜100）、引っかかった表現、その理由、言い換え案</dd>
+                <dt>対象</dt><dd>日本の同人圏／英語圏 AO3・Tumblr／韓国のファンカフェ／中国の微博</dd>
+              </dl>
+            </div>
+            <figure>
+              <img src="screenshots/02-check-result.png" alt="出国審査の結果画面。リスク88の判定と言い換え案、文化圏別レーダー" loading="lazy" width="2560" height="1800">
+              <figcaption>「かわいすぎて死んだ💀」を検査した画面。英語圏だけリスクが突出し、英語での自然な言い換え案が返ってきます。</figcaption>
+            </figure>
+          </article>
+
+          <article class="gate">
+            <div class="gate-head"><h3>入国審査</h3><span class="dir">INBOUND ／ 受信フィルタ</span></div>
+            <div class="gate-body">
+              <p>見たくない内容を自分の言葉で書くだけで、どの言語で書かれた作品でも事前に隠します。</p>
+              <dl>
+                <dt>入力</dt><dd>苦手なものの自然文（例：閉じ込められる話が無理）</dd>
+                <dt>出力</dt><dd>各言語圏のタグへの変換表と、作品ごとの「遮断／注意／通過」</dd>
+                <dt>特徴</dt><dd>タグが付いていなくても、あらすじから該当を見つける</dd>
+              </dl>
+            </div>
+            <figure>
+              <img src="screenshots/04-filter-result.png" alt="入国審査の結果画面。遮断6・注意2・通過4と、言語別タグへの変換表" loading="lazy" width="2560" height="1800">
+              <figcaption>「閉じ込められる」が英語では Captivity と hard no、日本語では「監禁」、中国語では「监禁／预警」に変換されます。</figcaption>
+            </figure>
+          </article>
+        </div>
+
+        <p>同じ一文でも、文化圏によって判定が大きく割れます。下はデモの実際の判定値です（リスクが高いほど誤読されやすい）。</p>
+        <div class="verdict-demo" aria-label="「新衣装かわいすぎて死んだ💀 しんどい……もう無理……」の文化圏別リスク">
+          <div class="culture g"><span class="name">日本語圏<br>同人圏</span><span class="score">8</span><span class="bar"><i style="width:8%"></i></span></div>
+          <div class="culture r"><span class="name">英語圏<br>AO3・Tumblr</span><span class="score">88</span><span class="bar"><i style="width:88%"></i></span></div>
+          <div class="culture y"><span class="name">韓国語圏<br>ファンカフェ</span><span class="score">44</span><span class="bar"><i style="width:44%"></i></span></div>
+          <div class="culture g"><span class="name">中国語圏<br>微博超話</span><span class="score">15</span><span class="bar"><i style="width:15%"></i></span></div>
+        </div>
+        <p style="font-size:13px;color:var(--muted)">出典：lib/demo.ts のプリセット「極性反転」。緑＝そのまま投稿してよい、黄＝注意、赤＝誤読の恐れが高い。</p>
+      </section>
+
+      <!-- 4 -->
+      <section id="how">
+        <div class="sec-label"><span class="no">04</span><span>HOW IT WORKS</span></div>
+        <h2>仕組み：4人の「現地の読者」と、訳し戻しの検算</h2>
+        <p>出国審査では、2種類のAI処理を同時に走らせ、最後に安全側へ倒す判定を加えます。</p>
+
+        <div class="flow" aria-label="出国審査の処理の流れ">
+          <div class="step">
+            <span class="m">STEP 1</span>
+            <span class="t">入力を無害化</span>
+            <span class="s">AIへの不正な指示の埋め込みを防ぐ前処理。文章の中身は変えない。</span>
+          </div>
+          <div class="join" aria-hidden="true">→</div>
+          <div class="par">
+            <div class="step key">
+              <span class="m">STEP 2a ｜ 同時実行</span>
+              <span class="t">4文化ペルソナが読む</span>
+              <span class="s">各文化圏の「読み方の常識」12項目を持たせたAIが、それぞれの立場で文章を読み、どこで誤解されるかを答える。</span>
+            </div>
+            <div class="step key">
+              <span class="m">STEP 2b ｜ 同時実行</span>
+              <span class="t">訳して、訳し戻す</span>
+              <span class="s">翻訳した文を日本語に戻し、「気持ちの向き」「敬語の度合い」「固有名詞・数字」「否定の構造」の4点を別々に採点する。</span>
+            </div>
+          </div>
+          <div class="join" aria-hidden="true">→</div>
+          <div class="step final">
+            <span class="m">STEP 3</span>
+            <span class="t">安全弁で最終判定</span>
+            <span class="s">訳し戻しで「気持ちの向き」か「否定の構造」の保存度が20以下なら赤（炎上リスク）、気持ちの向きが55以下なら黄に、ペルソナの判定より厳しい側へだけ引き上げる。</span>
+          </div>
+        </div>
+
+        <div class="mech">
+          <div>
+            <h3>文化規範カード</h3>
+            <p>4文化 × 12項目の「その文化圏で当たり前の読み方」を書いた知識集。このプロダクトの中核の資産です。文化圏の追加はカードを書き足すだけで済みます。</p>
+            <span class="file">lib/norms.ts</span>
+          </div>
+          <div>
+            <h3>気持ちの向きの反転を見張るルール</h3>
+            <p>「しんどい」「無理」「死ぬ」「草」「💀」は最上級の肯定であり得る、とAIに先に検討させる独立ルール。これがないとAIも直訳と同じ誤解をします。</p>
+            <span class="file">POLARITY_GUARD ／ lib/prompts.ts</span>
+          </div>
+          <div>
+            <h3>用語集は「出てきた語だけ」渡す</h3>
+            <p>35語のファンダム用語集から、文中に実際に出てきた語だけをAIに渡します。全部渡すと関係ない語に引きずられて判定が乱れるためです。</p>
+            <span class="file">lib/glossary.ts</span>
+          </div>
+          <div>
+            <h3>1つの言葉を、条件付きで複数のタグへ</h3>
+            <p>「地雷」は文脈によって英語圏の squick、NOTP、hard no のどれにもなります。入国審査は自然文を各言語のタグに1対多で変換し、架空作品12件のタグとあらすじに照らして判定します。</p>
+            <span class="file">lib/filter.ts ／ lib/works.ts</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5 -->
+      <section id="why-ai">
+        <div class="sec-label"><span class="no">05</span><span>WHY AI</span></div>
+        <h2>なぜ辞書やキーワード検索では足りないのか</h2>
+        <p>入国審査で「閉じ込められる話が苦手」と書いた人を守るには、下の作品をすべて見つける必要があります。ところが、宣言と作品の表記の間には共通する文字が一つもありません。</p>
+        <div class="nomatch">
+          <div class="side">
+            <div class="lab">利用者の宣言</div>
+            <div class="decl">閉じ込められる</div>
+          </div>
+          <div class="x">共通文字<br>ゼロ<small>文字列一致では届かない</small></div>
+          <div class="side">
+            <div class="lab">作品側の書き方</div>
+            <div class="terms"><span class="term">監禁</span><span class="term">监禁</span><span class="term">감금</span><span class="term">囚われた</span><span class="term">地下室から出られなくなった</span></div>
+          </div>
+        </div>
+        <div class="prose">
+          <p>出国審査も同じです。「無理」は文脈によって最上級の褒め言葉にも、本当の拒絶にもなります。辞書に「無理＝ポジティブ」と書いても、この文ではどちらなのかは書けません。</p>
+          <p>このため、ルールで代替できない処理だけをAIに任せる設計にしました。<strong>AIを取り除くと、このプロダクトには何も残りません。</strong></p>
+        </div>
+      </section>
+
+      <!-- 6 -->
+      <section id="result">
+        <div class="sec-label"><span class="no">06</span><span>EVALUATION</span></div>
+        <h2>検証結果：単語一致の方法は大半を見逃す</h2>
+        <p>「精度が高い」と言うだけでは確かめようがないため、正解付きのテスト問題（出国審査20件、入国審査8件）と、比較用の従来手法を用意しました。比較対象は、わざと有利になるように強めに作っています。</p>
+
+        <div class="bench">
+          <h3>入国審査：遮断すべき作品をどれだけ見逃したか</h3>
+          <div class="legend">
+            <span><i class="fn"></i>見逃し率（低いほど良い。実害が最も大きい）</span>
+            <span><i class="ob"></i>過剰遮断率（低いほど良い）</span>
+          </div>
+          <div class="brow">
+            <div class="who">タグ一致のみ<small>既存のタグ遮断機能に相当</small></div>
+            <div class="bars">
+              <div class="bline"><div class="track"><i class="fn" style="width:88.2%"></i></div><span class="v">88.2%</span></div>
+              <div class="bline"><div class="track"><i class="ob" style="width:12.5%"></i></div><span class="v">12.5%</span></div>
+            </div>
+          </div>
+          <div class="brow">
+            <div class="who">タグ＋あらすじ全文検索<small>強めに作った比較手法</small></div>
+            <div class="bars">
+              <div class="bline"><div class="track"><i class="fn" style="width:76.5%"></i></div><span class="v">76.5%</span></div>
+              <div class="bline"><div class="track"><i class="ob" style="width:37.5%"></i></div><span class="v">37.5%</span></div>
+            </div>
+          </div>
+          <div class="axis" aria-hidden="true">
+            <div></div>
+            <div class="ticks"><div><span>0</span><span>25</span><span>50</span><span>75</span><span>100%</span></div><div></div></div>
+          </div>
+          <p class="pending">全文検索を加えても見逃しは少ししか減らず、代わりに過剰遮断が3倍に増えます。ニュアンス税関の実モデルでの計測は、APIキーを設定すれば <code>npm run eval:live</code> の1コマンドで実行できる状態で、<strong>現時点では未計測</strong>です。</p>
+        </div>
+
+        <p>出国審査側では、テスト16件のうち5件が用語集に一度もヒットしませんでした。ルールだけでは判定の手がかりがゼロになるケースです。</p>
+
+        <p>1つの「正答率」にまとめていないのは、失敗の種類ごとに被害の重さが違うためです。見逃しは読者に実害が出ますが、過剰遮断は解除すれば読めます。さらに、何も問題のない文章（対照群）も混ぜ、「全部危険と答えれば満点」になる抜け道を塞いでいます。</p>
+
+        <div class="scroll">
+          <table class="status">
+            <thead><tr><th>主張</th><th>状況</th><th>確かめ方</th></tr></thead>
+            <tbody>
+              <tr><td>単語一致の方法は大半を見逃す</td><td><span class="pill ok">実測済み</span></td><td><code>npm run eval</code>（APIキー不要）</td></tr>
+              <tr><td>ルールだけでは手がかりがゼロのケースがある</td><td><span class="pill ok">実測済み</span></td><td>同上</td></tr>
+              <tr><td>失敗時に安全側へ倒れる仕組みが動く</td><td><span class="pill ok">テスト済み</span></td><td><code>npm test</code>（17件）</td></tr>
+              <tr><td>実際のAIが比較手法を上回る</td><td><span class="pill wait">未計測</span></td><td><code>npm run eval:live</code></td></tr>
+              <tr><td>実際のファンに役立つ</td><td><span class="pill no">未検証</span></td><td>ユーザーテスト未実施</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 7 -->
+      <section id="safety">
+        <div class="sec-label"><span class="no">07</span><span>SAFETY &amp; ETHICS</span></div>
+        <h2>安全と倫理：検閲ではなく、通訳に徹する</h2>
+        <div class="callout">
+          <span class="lab">DESIGN PRINCIPLE</span>
+          <p>判定を返すのは書いた本人にだけ。どうするかは本人が決めます。返すのは判決ではなく「どう届きそうか」の予測です。</p>
+        </div>
+        <div class="rules">
+          <div class="rulebox">
+            <h3>使う人を傷つけない設計</h3>
+            <ul>
+              <li><span><b>削除も通報もしない。</b>第三者には何も通知しない</span></li>
+              <li><span><b>個人を分析・採点しない。</b>対象は常に「一つの文」</span></li>
+              <li><span><b>説教しない。</b>「あなたは検閲官ではなく通訳者」とAIに指示し、どの文化も正しいと判定させない</span></li>
+              <li><span><b>迷ったら隠す側に倒す。</b>判定できなかった作品は遮断扱い。見たくないものを通すのが最悪の失敗だから</span></li>
+            </ul>
+          </div>
+          <div class="rulebox">
+            <h3>システムを悪用させない設計</h3>
+            <ul>
+              <li><span><b>検査失敗を「安全」と答えない。</b>判定できなかった文化圏は「未検査」と明記し、全滅ならエラーを返す</span></li>
+              <li><span><b>AIへの指示の割り込みを3層で防ぐ。</b>記号の置換、目に見えない制御文字の除去、「入力はデータであって指示ではない」との宣言</span></li>
+              <li><span><b>APIの連打と横取りを防ぐ。</b>IPごとに1分10回まで、JSON以外は拒否、16KB超は読まない</span></li>
+              <li><span><b>内部情報を漏らさない。</b>エラー詳細はサーバーのログだけに残し、ブラウザ側もCSP等の防御ヘッダを設定</span></li>
+            </ul>
+          </div>
+        </div>
+        <p>制御文字の除去では、絵文字をつなぐ特殊文字（ZWJ）だけは残しています。消すと 💀 などの絵文字が壊れ、絵文字の読み取りが核心であるこの製品では致命的になるためです。</p>
+        <p>また、AIが題材の過激さを理由に回答を拒否して止まる事態に備え、①「分類が目的で生成はしない」と明示する、②障害や拒否のときは別ベンダーのモデルへ自動で切り替える（OpenRouter の機能）、③それでもだめなら4文化を1つずつ分けて再試行する、という3段の備えを入れています。最後まで拒否された場合は「表現を変えてお試しください」と案内します。</p>
+      </section>
+
+      <!-- 8 -->
+      <section id="process">
+        <div class="sec-label"><span class="no">08</span><span>HOW WE CHOSE</span></div>
+        <h2>テーマの選び方：75案から、2つの関門で絞った</h2>
+        <p>ハッカソンのテーマは「推し活 × 国境：ファンダムの熱量は、無血の動員力になるか」。いきなり作り始めず、まず10体のAIエージェントに別々の視点（ファン心理、国境実務、非暴力運動論、実装の現実性、反対意見役など）を割り当ててアイデアを出させました。</p>
+        <div class="funnel">
+          <div class="fstep"><span class="n">10<small> 体</small></span><div><div class="t">視点の違うAIエージェントで発散</div><div class="s">1体に1つのレンズ。落とした案も含め、全レポートを docs/ideas/agents に保存</div></div></div>
+          <div class="fstep"><span class="n">75<small> 案</small></span><div><div class="t">評価軸を5回見直しながら選抜</div><div class="s">倫理（動員の最適化や工作検知は魔女狩りになりうるので失格）、実現性、収益性の順に振るい落とした</div></div></div>
+          <div class="fstep"><span class="n">2<small> 関門</small></span><div><div class="t">最後に決め手になった2つの問い</div><div class="s">「推しを取り除いても成立するなら、このテーマの案ではない」「AIを取り除いても成立するなら、AIプロダクトではない」</div></div></div>
+          <div class="fstep win"><span class="n">1<small> 案</small></span><div><div class="t">両方を通過したのはニュアンス税関だけ</div><div class="s">発信側と受信側の2案が同じ中核能力を使っていたため、1つに統合した</div></div></div>
+        </div>
+        <div class="scroll">
+          <table class="twogate">
+            <thead><tr><th>候補</th><th>推しを外すと</th><th>AIを外すと</th></tr></thead>
+            <tbody>
+              <tr><td>翻訳義勇軍（多言語防災）</td><td><span class="ng-mark">✕</span> 普通の翻訳ツールとして成立</td><td><span class="ok-mark">○</span> 何も残らない</td></tr>
+              <tr><td>聖地の作法</td><td><span class="ok-mark">○</span> 聖地が消える</td><td><span class="ng-mark">✕</span> AIなしで成立</td></tr>
+              <tr><td>推し活パリティ ／ OshiAid</td><td><span class="ok-mark">○</span> 成立しない</td><td><span class="ng-mark">✕</span> もともとAI不要</td></tr>
+              <tr class="win"><td>ニュアンス税関</td><td><span class="ok-mark">○</span> 知識資産がゼロになる</td><td><span class="ok-mark">○</span> 何も残らない</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prose">
+          <p><strong>テーマへの答え方。</strong>調査では、ファンの熱量が動員に変わるには5つの条件が要ると整理しました。旗印になる推し、応援の作法、成果が見える数字の3つは国境を越えても壊れません。壊れるのは「言語を越えて中継する橋」と「推しの名を汚さないという自制」の2つだけです。入国審査が橋を、出国審査が自制を支えます。</p>
+          <p>「無血」が破れるのは、たいてい誰かが攻撃を意図したときではなく、熱量が誤訳されて届いたときです。このツールは動員を起こしたり煽ったりはしません。その前提となる橋と自制を整えることに徹しています。</p>
+        </div>
+      </section>
+
+      <!-- 9 -->
+      <section id="stack">
+        <div class="sec-label"><span class="no">09</span><span>TECH STACK</span></div>
+        <h2>技術スタック</h2>
+        <div class="stack">
+          <div><span class="k">FRAMEWORK</span><span class="v">Next.js 16 ／ React 19</span><span class="w">画面とAPIを1つのプロジェクトで。TypeScriptで型チェック</span></div>
+          <div><span class="k">STYLING</span><span class="v">Tailwind CSS 4</span><span class="w">ダークトーンのUI、スマホ対応</span></div>
+          <div><span class="k">AI GATEWAY</span><span class="v">OpenRouter</span><span class="w">1つのAPIキーでClaude・Gemini・GPTを切り替え可能</span></div>
+          <div><span class="k">VALIDATION</span><span class="v">Zod 4</span><span class="w">AIの回答を決まった形式（JSON）で受け取り、崩れたら弾く</span></div>
+          <div><span class="k">HOSTING</span><span class="v">Vercel</span><span class="w">mainへのpushで自動デプロイ。キー未設定でもデモで動く</span></div>
+          <div><span class="k">QUALITY</span><span class="v">node:test ／ 評価基盤 ／ Playwright</span><span class="w">安全ロジックのテスト17件、ベンチマーク、画面写真の自動撮影</span></div>
+        </div>
+        <p>処理ごとに向いたモデルを使い分けています。判定の核には高性能なモデルを、毎回並行して走る機械的な処理には安価で速いモデルを割り当て、環境変数だけで差し替えられます。</p>
+        <div class="scroll">
+          <table class="models">
+            <thead><tr><th>処理</th><th>役割</th><th>既定のモデル</th></tr></thead>
+            <tbody>
+              <tr><td>panel</td><td>4文化ペルソナによる判定（プロダクトの核）</td><td class="mono">anthropic/claude-sonnet-5</td></tr>
+              <tr><td>gate</td><td>訳し戻しによる検算</td><td class="mono">google/gemini-2.5-flash</td></tr>
+              <tr><td>filter</td><td>入国審査のタグ変換と遮断判定</td><td class="mono">google/gemini-2.5-flash</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prose">
+          <p><strong>既知の制約。</strong>用語集は35語、文化規範カードは4文化×12項目の初期版です。入国審査の作品データは、実在サイトのデータを規約上収集できないため、言語ごとのタグ文化の違いを再現した架空作品12件で構成しています。APIキーがない場合はデモモードになり、用意した例文（出国4例、入国1例）だけを判定します。</p>
+        </div>
+      </section>
+      <!-- 10 -->
+      <section id="fixes">
+        <div class="sec-label"><span class="no">10</span><span>CODE REVIEW</span></div>
+        <h2>コードレビューで見つけて直したこと</h2>
+        <p>この資料を作る際にコード全体を読み直し、設計の意図どおりに動いていなかった箇所を5つ修正しました。機能や画面は変えていません。どれも数行の修正で、修正前に失敗し修正後に通るテストを3件追加しています（テストは14件から17件に）。</p>
+        <div class="scroll">
+          <table class="status fixes">
+            <thead><tr><th>何が起きていたか</th><th>直した内容</th><th>影響</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>AIが回答を拒否したとき、理由の分からないエラーになっていた。</b>4文化を分けて再試行しても全部拒否された場合、拒否だという情報が汎用エラーに包まれ、用意していた「表現を変えてお試しください」の案内に届いていなかった</td>
+                <td>全部が拒否で終わったときは、拒否エラーのまま返すようにした</td>
+                <td><span class="pill no">利用者向け</span></td>
+              </tr>
+              <tr>
+                <td><b>一部の文化圏で訳し戻しの採点が欠けると、根拠のない「炎上リスク」を出していた。</b>欠けた採点を0点で埋めていたため、安全弁が「気持ちの向きの保存度 0」という測っていない値を理由に赤判定へ引き上げていた</td>
+                <td>欠けた文化圏は採点なしとして扱い、ペルソナ判定をそのまま使う。訳し戻し全体が失敗したときの扱いと揃えた</td>
+                <td><span class="pill no">利用者向け</span></td>
+              </tr>
+              <tr>
+                <td><b>予備モデルへの切り替え指定から主モデルが抜けていた。</b>OpenRouter の <code>models</code> は「優先順に試すモデルの一覧」だが、予備の2つだけを渡していた</td>
+                <td>主モデルを一覧の先頭に入れ、公式ドキュメントの例と同じ形にした</td>
+                <td><span class="pill wait">要実機確認</span></td>
+              </tr>
+              <tr>
+                <td><b>レート制限の記録が溢れたとき、連打中の相手の制限が解除されることがあった。</b>「最も古いキーから捨てる」つもりが、JavaScript の Map は上書きしても順番が変わらないため、アクセスし続けている相手が最古扱いのまま残っていた</td>
+                <td>記録するたびにキーを末尾へ移し、本当に使われていないものから捨てるようにした</td>
+                <td><span class="pill ok">防御の強化</span></td>
+              </tr>
+              <tr>
+                <td><b>本文サイズの上限が「バイト」ではなく「文字数」で測られていた。</b>日本語は1文字3バイトのため、実際には上限の約3倍まで通っていた</td>
+                <td>UTF-8 のバイト数で測るようにした</td>
+                <td><span class="pill ok">防御の強化</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>あわせて README の記述のずれを1か所直しました。「判定できなかった文化圏は緑（安全）で埋める」と書かれていましたが、実際のコードは黄（未検査）で埋めており、コードの方が設計方針（検査に失敗したら安全と答えない）に沿っていました。</p>
+        <p style="font-size:13px;color:var(--muted)">「要実機確認」の項目は、OpenRouter の公式ドキュメントの例に合わせた修正です。この環境からは OpenRouter に接続できず、実際のAPIでの動作はまだ確かめていません。APIキーを設定して <code>npm run eval:live</code> を実行すると確認できます。</p>
+      </section>
+    </main>
+  </div>
+
+  <footer class="foot">
+    <span>出典：リポジトリ keyakizakap-alt/syakai-hackathon の README.md、docs/THEME.md、docs/BENCHMARK.md（2026-09-08 実行）、docs/ideas/README.md、lib/ 以下のソース</span>
+    <span>2026-09-28 作成</span>
+  </footer>
+</div>
