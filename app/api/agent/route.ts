@@ -16,14 +16,27 @@ export const maxDuration = 60;
 const MAX_CHARS = 600;
 
 /**
+ * キーがあるとき（＝実際に費用が掛かるとき）、1回の実行はレート制限上この回数分として数える。
+ *
+ * 1回の実行は LLM を最大6回呼ぶ（panel1＋gate1＋検証4）。/api/check の2回の約3倍で、
+ * 1リクエスト＝1回分のままだと、悪意ある連打で費用が約3倍に膨らむ。
+ * デモ再生は何も呼ばず費用が掛からないので、1回分のまま（審査員がプリセットを続けて試せるように）。
+ */
+const LIVE_RATE_COST = 3;
+
+/**
  * 摩擦予防エージェントの実行。進捗を NDJSON（1行1イベント）で流す。
  *
  * /api/check は残してある（eval とクライアントのフォールバック用）。こちらはその上に
  * 「どう作業したか」を見せる層で、判定の中身は同じ analyze() を通る。
  */
 export async function POST(req: Request) {
-  const blocked = guardRequest(req);
-  if (blocked) return blocked;
+  const live = hasCredentialsFor("panel");
+  // guardRequest は呼ぶたびに1回分を数える。共有の入口ガードを変えずに、重みを付ける
+  for (let i = 0; i < (live ? LIVE_RATE_COST : 1); i++) {
+    const blocked = guardRequest(req);
+    if (blocked) return blocked;
+  }
 
   const parsed = await readJsonBody(req);
   if ("error" in parsed) return parsed.error;
@@ -32,7 +45,6 @@ export async function POST(req: Request) {
   if ("error" in field) return field.error;
   const text = field.value;
 
-  const live = hasCredentialsFor("panel");
   // キー無しではプリセットだけデモ再生する。それ以外は /api/check と同じく 503
   const script = live ? null : demoAgentScript(text);
   if (!live && !script) {
