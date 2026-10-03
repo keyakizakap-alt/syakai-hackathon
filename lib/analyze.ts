@@ -1,6 +1,7 @@
 import * as z from "zod/v4";
 
 import { complete } from "./dispatch";
+import { RefusalError } from "./errors";
 import { POLARITY_GUARD, sanitizeForPrompt, TONE_RULE, UNTRUSTED_INPUT_RULE } from "./prompts";
 
 import { NORM_CARDS } from "./norms";
@@ -197,6 +198,19 @@ async function runPanelCombined(input: string, hits: GlossaryEntry[]): Promise<C
   });
 }
 
+/**
+ * 分割判定が全滅したときに投げるエラー。
+ *
+ * 全文化がモデルの拒否で落ちた場合は RefusalError をそのまま投げる。汎用の Error で
+ * 包むと、route.ts の instanceof RefusalError による 422（表現を変えてお試しください）の
+ * 分岐に到達できず、利用者には原因の分からない 500 が返ってしまう。
+ */
+function panelSplitFailure(reasons: unknown[]): Error {
+  const refusal = reasons.find((r): r is RefusalError => r instanceof RefusalError);
+  if (refusal && reasons.every((r) => r instanceof RefusalError)) return refusal;
+  return new Error("文化ペルソナ判定がすべて失敗しました", { cause: reasons[0] });
+}
+
 /** 層3（縮退運転）：1文化ずつ個別リクエストに分割する。統合判定が全滅した場合の最終手段 */
 async function runPanelSplit(input: string, hits: GlossaryEntry[]): Promise<CultureReading[]> {
   const user = `次の投稿文を判定せよ。\n\n<投稿文>\n${sanitizeForPrompt(input)}\n</投稿文>`;
@@ -218,10 +232,7 @@ async function runPanelSplit(input: string, hits: GlossaryEntry[]): Promise<Cult
   // 4文化すべてが未検査のまま 200 で返すと、利用者には正常に判定されたように見え、
   // 実際には何も検査されていないという最悪の誤認を生む。エラーとして扱う。
   if (settled.every((s) => s.status === "rejected")) {
-    const first = settled.find((s) => s.status === "rejected");
-    throw new Error("文化ペルソナ判定がすべて失敗しました", {
-      cause: first?.status === "rejected" ? first.reason : undefined,
-    });
+    throw panelSplitFailure(settled.map((s) => (s.status === "rejected" ? s.reason : undefined)));
   }
 
   return settled.map((s, i) => {
@@ -252,18 +263,17 @@ async function runGate(input: string, hits: GlossaryEntry[]): Promise<BackTransl
   const parsed = await complete("gate", gateSystem(hits), user, GateSchema);
 
   const byCulture = new Map(parsed.results.map((r) => [r.culture, r]));
-  return CULTURE_IDS.map((id): BackTranslation => {
+  // 採点が返ってこなかった文化は結果に含めない。以前は全次元0で埋めていたが、
+  // それだと applyGate が「極性保存度 0」という実測していない値を根拠に red へ昇格させ、
+  // 利用者に誤った理由を見せてしまう。ゲート全体が失敗した場合（ペルソナ判定のみで返す）と
+  // 同じ扱いに揃える。
+  return CULTURE_IDS.flatMap((id): BackTranslation[] => {
     const r = byCulture.get(id);
     if (!r) {
-      return {
-        culture: id,
-        translation: "",
-        backTranslation: "",
-        dimensions: { polarity: 0, register: 0, entities: 0, negation: 0 },
-        drift: "（採点を取得できませんでした）",
-      };
+      console.error(`[gate] ${id} の採点を取得できなかったため、ゲートなしで判定します`);
+      return [];
     }
-    return {
+    return [{
       culture: id,
       translation: r.translation,
       backTranslation: r.back_translation,
@@ -274,7 +284,7 @@ async function runGate(input: string, hits: GlossaryEntry[]): Promise<BackTransl
         negation: Math.round(r.negation),
       },
       drift: r.drift,
-    };
+    }];
   });
 }
 
@@ -339,5 +349,5 @@ export async function analyze(input: string): Promise<CheckResult> {
   };
 }
 
-export const __testing = { applyGate, overallOf, unjudgedCultureReading };
+export const __testing = { applyGate, overallOf, unjudgedCultureReading, panelSplitFailure };
 export type { CultureId };
