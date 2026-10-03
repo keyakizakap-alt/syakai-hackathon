@@ -1,5 +1,5 @@
 import { lookupGlossary, toHit } from "./glossary";
-import type { BackTranslation, CheckResult, CultureReading } from "./types";
+import type { BackTranslation, CheckResult, CultureId, CultureReading } from "./types";
 
 export interface Preset {
   id: string;
@@ -134,6 +134,46 @@ const PAYLOADS: Record<string, DemoPayload> = {
   },
 };
 
+/**
+ * 各 reading が根拠にした規範カードの番号（1始まり）と、原文を変えずに添える一言注釈。
+ * 実モデルが返す norm_refs / bridge_note の代わりに、デモでは手書きしている。
+ *
+ * 番号は各 reading の文面と規範本文を突き合わせて付けた。整合は tests/agent.test.ts と
+ * tests/friction.test.ts が機械的に確認する（番号が実在する／添え書きは言い方のずれにだけ付く／
+ * 検証対象がエージェントの判断ルールと一致する）。
+ */
+const DEMO_FRICTION: Record<string, Partial<Record<CultureId, { normRefs: number[]; bridgeNote?: string }>>> = {
+  polarity: {
+    jp_doujin: { normRefs: [3] },
+    en_ao3: { normRefs: [4], bridgeNote: '(※ "I died 💀" = I love it. This is delight, not a distress call.)' },
+    kr_fancafe: { normRefs: [1], bridgeNote: "(※ ‘죽었다’는 최고의 칭찬이에요. 걱정하지 않으셔도 돼요 💀)" },
+    zh_weibo: { normRefs: [2] },
+  },
+  interpretation: {
+    jp_doujin: { normRefs: [8, 9] },
+    en_ao3: {
+      normRefs: [2, 12],
+      bridgeNote: '(※ Japanese 「解釈違い」 = "not quite my read" — a gentle personal take, not a verdict on your work.)',
+    },
+    kr_fancafe: { normRefs: [5], bridgeNote: "(※ ‘해석 차이’는 ‘제 취향과는 조금 달라요’라는 부드러운 표현이에요.)" },
+    // 超话の外から他人の解釈に言及する形＝どこで言うかの線引き。添え書きでは防げない
+    zh_weibo: { normRefs: [1] },
+  },
+  warning: {
+    jp_doujin: { normRefs: [1] },
+    en_ao3: { normRefs: [1], bridgeNote: "(CW: confinement, captivity. 「地雷」 here means a hard no, not landmines.)" },
+    kr_fancafe: { normRefs: [11], bridgeNote: "(※ ‘지뢰’는 일본어로 ‘보기 싫은 요소’를 뜻해요. 소재: 감금)" },
+    zh_weibo: { normRefs: [12], bridgeNote: "(预警：监禁。「地雷」即「雷点」，请避雷。)" },
+  },
+  // 会計・集金は行為そのものの線引き。言い方を直しても残るので、4文化とも線引きのずれ
+  accountability: {
+    jp_doujin: { normRefs: [7] },
+    en_ao3: { normRefs: [11] },
+    kr_fancafe: { normRefs: [7] },
+    zh_weibo: { normRefs: [1, 9] },
+  },
+};
+
 export function demoResult(input: string): CheckResult | null {
   const preset = PRESETS.find((p) => p.text === input.trim());
   if (!preset) return null;
@@ -143,7 +183,7 @@ export function demoResult(input: string): CheckResult | null {
     input,
     overall: payload.overall,
     glossaryHits: lookupGlossary(input).map(toHit),
-    cultures: payload.cultures,
+    cultures: payload.cultures.map((c) => ({ ...c, ...DEMO_FRICTION[preset.id]?.[c.culture] })),
     backTranslations: payload.backTranslations,
     mode: "demo",
     elapsedMs: 0,

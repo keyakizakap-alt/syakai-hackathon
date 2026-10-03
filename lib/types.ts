@@ -14,6 +14,13 @@ export interface Trigger {
   why: string;
 }
 
+/**
+ * 摩擦の種類。防ぎ方が違うため分けている。
+ * - wording（言い方のずれ）：語・表記・語尾・敬称・警告の書き方。直せば消えるので、添え書きで橋渡しできる
+ * - boundary（線引きのずれ）：行為・題材そのものの線引き。直しても残るので、発信者が選ぶ
+ */
+export type FrictionKind = "wording" | "boundary";
+
 export interface CultureReading {
   culture: CultureId;
   verdict: Verdict;
@@ -24,6 +31,18 @@ export interface CultureReading {
   triggers: Trigger[];
   /** その文化向けの言い換え。問題がなければ null */
   rewrite: string | null;
+  /**
+   * 判定の根拠にした規範カードの番号（1始まり、その文化圏のカード内）。実在する番号だけが入る。
+   * 任意項目：未指定は「根拠を引けなかった」であり、「摩擦がない」ではない。
+   */
+  normRefs?: number[];
+  /**
+   * 原文を一字も変えずに末尾へ添える、その文化圏の言語での一言注釈。
+   * 言い方のずれで、注釈で防げる場合のみ。線引きのずれでは常に無い。
+   */
+  bridgeNote?: string | null;
+  /** 判定を取得できなかった文化圏。未検査であり、安全とは見なせない */
+  unjudged?: true;
 }
 
 export interface BackTranslation {

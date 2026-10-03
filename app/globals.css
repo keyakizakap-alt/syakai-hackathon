@@ -63,3 +63,68 @@ body {
     animation: none;
   }
 }
+
+/* ── 摩擦予防エージェント ─────────────────────────────────────
+   動きは「いま何が走っているか」を伝えるためだけに使う。
+   prefers-reduced-motion では止めて、静的な表示に切り替える。 */
+
+/* 実行中の手順の丸が脈打つ */
+@keyframes agent-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent-a) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.agent-pulse {
+  animation: agent-pulse 1.4s ease-out infinite;
+}
+
+/* ②の並列レーン。実行中は帯が流れる（親は overflow-hidden） */
+@keyframes agent-indeterminate {
+  0% {
+    margin-left: -40%;
+  }
+  100% {
+    margin-left: 100%;
+  }
+}
+
+.agent-indeterminate {
+  width: 40%;
+  background-image: linear-gradient(90deg, var(--color-accent-a), var(--color-accent-b));
+  animation: agent-indeterminate 1.1s ease-in-out infinite;
+}
+
+/* Before→After のバーが左から伸びる */
+@keyframes agent-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.agent-grow {
+  transform-origin: left;
+  animation: agent-grow 0.7s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-pulse,
+  .agent-grow {
+    animation: none;
+  }
+  .agent-indeterminate {
+    animation: none;
+    width: 100%;
+    margin-left: 0;
+    opacity: 0.55;
+  }
+}

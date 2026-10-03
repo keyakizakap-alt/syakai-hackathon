@@ -45,6 +45,12 @@ export interface CheckCase {
     mustDiverge?: [CultureId, CultureId][];
     /** 原文中のこの部分文字列が、いずれかの文化で trigger として検出されるべき */
     mustFlagSpans?: string[];
+    /**
+     * その文化圏の判定が根拠に挙げるべき規範カードの番号（1始まり）。**any-of**：どれか1つを含めば的中。
+     * 規範カードは「どれが当てはまるか」に幅があるため、1つに決め打ちせず候補を許している。
+     * 判定の合否（passed）には含めず、「根拠の的中率」として独立に測る（既存の指標を変えないため）。
+     */
+    mustCiteNorm?: Partial<Record<CultureId, number[]>>;
   };
 }
 
@@ -59,6 +65,7 @@ export const CHECK_CASES: CheckCase[] = [
       polarityPositive: true,
       minVerdict: { en_ao3: "yellow" },
       mustFlagSpans: ["死んだ"],
+      mustCiteNorm: { en_ao3: [4] },
     },
   },
   {
@@ -99,6 +106,7 @@ export const CHECK_CASES: CheckCase[] = [
     expect: {
       minVerdict: { en_ao3: "yellow" },
       mustFlagSpans: ["解釈違い"],
+      mustCiteNorm: { en_ao3: [2, 12] },
     },
   },
   {
@@ -128,6 +136,7 @@ export const CHECK_CASES: CheckCase[] = [
     expect: {
       minVerdict: { en_ao3: "yellow" },
       mustDiverge: [["zh_weibo", "en_ao3"]],
+      mustCiteNorm: { kr_fancafe: [7], en_ao3: [11] },
     },
   },
   {
@@ -138,6 +147,7 @@ export const CHECK_CASES: CheckCase[] = [
     expect: {
       minVerdict: { jp_doujin: "yellow" },
       mustFlagSpans: ["中の人"],
+      mustCiteNorm: { jp_doujin: [11] },
     },
   },
   {
@@ -155,7 +165,10 @@ export const CHECK_CASES: CheckCase[] = [
     category: "culture_divergence",
     text: "세츠 진짜 귀엽다 ㅋㅋ",
     why: "KR規範では対象への敬称・敬語階層が厳格。敬称を欠いた言及は他文化圏では無害でもKR圏で問題化しうる",
-    expect: { minVerdict: { kr_fancafe: "yellow" } },
+    expect: {
+      minVerdict: { kr_fancafe: "yellow" },
+      mustCiteNorm: { kr_fancafe: [1] },
+    },
   },
   {
     id: "div-05",
@@ -165,6 +178,7 @@ export const CHECK_CASES: CheckCase[] = [
     expect: {
       minVerdict: { jp_doujin: "red", en_ao3: "yellow" },
       mustFlagSpans: ["定価"],
+      mustCiteNorm: { jp_doujin: [10] },
     },
   },
 
@@ -177,6 +191,7 @@ export const CHECK_CASES: CheckCase[] = [
     expect: {
       minVerdict: { en_ao3: "yellow" },
       mustFlagSpans: ["地雷"],
+      mustCiteNorm: { en_ao3: [1] },
     },
   },
   {

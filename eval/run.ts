@@ -95,6 +95,11 @@ async function runLive() {
   say();
   say(`過剰警告（対照群を green と判定できなかった）: ${agg.controlOverWarned}/${agg.controlTotal}`);
   say();
+  say(
+    `根拠の的中率（規範カードの番号。any-of）: ${agg.citeHit}/${agg.citeTotal}` +
+      (agg.citeTotal > 0 ? `（${pct(agg.citeHit / agg.citeTotal)}）` : ""),
+  );
+  say();
 
   say("### 実モデル：入国審査");
   say();
@@ -186,6 +191,9 @@ async function main() {
     say("## 実モデルの評価");
     say();
     say("`OPENROUTER_API_KEY` を設定して `npm run eval:live` を実行すると計測される。");
+    say();
+    say("計測される指標：出国審査の合格率（カテゴリ別）／対照群の過剰警告／**根拠の的中率**（規範カードの番号、any-of）／入国審査の偽陰性率・過剰遮断率・意味理解のみの項目の捕捉。");
+    say("いずれも実モデルでのみ測れるため、現時点では**未計測**である。");
     say();
   }
 

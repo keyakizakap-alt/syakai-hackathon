@@ -11,7 +11,7 @@
  * - U+200D（ZWJ）は落とさない。👨‍👩‍👧 のような絵文字の連結に使われており、
  *   これを消すと絵文字が別物に化ける（💀 の扱いが核心の製品で致命的）
  */
-function stripInvisible(text: string): string {
+export function stripInvisible(text: string): string {
   return (
     text
       // C0/C1制御文字（\t \n \r は残す）

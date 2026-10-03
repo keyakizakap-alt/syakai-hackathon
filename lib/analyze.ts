@@ -2,6 +2,7 @@ import * as z from "zod/v4";
 
 import { complete } from "./dispatch";
 import { RefusalError } from "./errors";
+import { frictionFields } from "./friction";
 import { POLARITY_GUARD, sanitizeForPrompt, TONE_RULE, UNTRUSTED_INPUT_RULE } from "./prompts";
 
 import { NORM_CARDS } from "./norms";
@@ -29,17 +30,22 @@ const PanelSchema = z.object({
       reading: z.string(),
       triggers: z.array(z.object({ span: z.string(), why: z.string() })),
       rewrite: z.string().nullable(),
+      // 根拠にした規範カードの番号と、原文を変えずに添える注釈。検証と正規化は friction.ts が行う
+      norm_refs: z.array(z.number()),
+      bridge_note: z.string().nullable(),
     }),
   ),
 });
 
-/** 層3（縮退運転）：1文化だけを判定するときのスキーマ */
+/** 層3（縮退運転）と、エージェントの自己検証で使う：1文化だけを判定するときのスキーマ */
 const SingleReadingSchema = z.object({
   verdict: z.enum(["green", "yellow", "red"]),
   risk: z.number().min(0).max(100),
   reading: z.string(),
   triggers: z.array(z.object({ span: z.string(), why: z.string() })),
   rewrite: z.string().nullable(),
+  norm_refs: z.array(z.number()),
+  bridge_note: z.string().nullable(),
 });
 
 const GateSchema = z.object({
@@ -82,7 +88,7 @@ function panelSystem(hits: GlossaryEntry[], cultureId?: CultureId): string {
   const targetIds = cultureId ? [cultureId] : CULTURE_IDS;
   const cards = targetIds
     .map((id) => {
-      const items = NORM_CARDS[id].map((n, i) => `  ${i + 1}. ${n}`).join("\n");
+      const items = NORM_CARDS[id].map((n, i) => `  ${i + 1}. ${n.text}`).join("\n");
       return `## ${id}（${CULTURES[id].label}）\n${items}`;
     })
     .join("\n\n");
@@ -95,6 +101,11 @@ function panelSystem(hits: GlossaryEntry[], cultureId?: CultureId): string {
     ? `- reading は「${CULTURES[cultureId].label}の読者にはこう読める」を、その読者の視点で2〜3文で書く。`
     : `- 4文化すべてについて必ず1件ずつ返す。
 - reading は「その文化圏の読者にはこう読める」を、その読者の視点で2〜3文で書く。`;
+
+  // bridge_note はその文化圏の読者に向けた注釈なので、書く言語を明示する
+  const noteLanguage = cultureId
+    ? CULTURES[cultureId].language
+    : CULTURE_IDS.map((id) => `${id}=${CULTURES[id].language}`).join(" / ");
 
   return `あなたは越境ファンダムの文化翻訳を専門とする分析者である。
 ${scope}
@@ -121,7 +132,12 @@ ${outputRule}
 - verdict: green=そのまま出して問題ない / yellow=誤読される可能性がある / red=炎上リスクがある
 - risk は verdict と整合させる（green は 0-25、yellow は 26-65、red は 66-100 の範囲）。
 - rewrite はその文化圏向けの言い換え。green の場合は null。
-  言い換えは原文の熱量と強度を保つこと。無難にして温度を落とすのは失敗である。`;
+  言い換えは原文の熱量と強度を保つこと。無難にして温度を落とすのは失敗である。
+- norm_refs は、判定の根拠にした規範カードの番号（その reading の文化圏のカード内の番号）を、
+  効いた順に最大3つ。カードの項目に基づく場合だけ挙げる。当てはまる項目がなければ空配列にし、無理に当てはめない。
+- bridge_note は、原文を一字も変えずに末尾へ添える一言の注釈（${noteLanguage} で、60字程度まで）。
+  言い方の違い（語の意味・表記・語尾・警告の書き方）が原因で、注釈を添えれば誤読を防げる場合だけ書く。
+  原文の熱量を下げない。行為や題材そのものが問題の場合、または green の場合は null。`;
 }
 
 function gateSystem(hits: GlossaryEntry[]): string {
@@ -156,6 +172,28 @@ ${glossaryBlock(hits)}
 // ── 呼び出し ───────────────────────────────────────────────────
 
 /**
+ * 進捗の観測用フック。エージェントが作業の様子を画面に流すために使う。省略時は何もしない。
+ * 観測のための仕組みであって、判定の挙動には一切関与しない。
+ */
+export interface AnalyzeHooks {
+  /** 用語集の照合が終わった */
+  onGlossary?: (hits: GlossaryEntry[]) => void;
+  /** 並列レーン（panel / gate）の開始と終了 */
+  onLane?: (e: { lane: "panel" | "gate"; phase: "start" | "end"; ok?: boolean; ms?: number }) => void;
+  /** panel が統合判定から、文化ごとの分割判定に縮退した */
+  onDegrade?: (kind: "panel_split") => void;
+}
+
+/** フックの失敗（例：切断済みのストリームへの書き込み）で、判定そのものを止めない */
+function notify(fn: () => void): void {
+  try {
+    fn();
+  } catch (err) {
+    console.error("[analyze] 観測フックが失敗しました（判定は続行します）", err);
+  }
+}
+
+/**
  * 判定が取得できなかった文化圏を埋める値。
  *
  * **green を返してはならない。** 出国審査における green は「そのまま投稿して問題ない」
@@ -174,6 +212,8 @@ function unjudgedCultureReading(id: CultureId): CultureReading {
     reading: "この文化圏の判定を取得できませんでした。未検査のため、安全とは見なせません。時間をおいて再度お試しください。",
     triggers: [],
     rewrite: null,
+    // UI が「摩擦なし」と取り違えないよう、reading の文面とは別に機械可読な印を付ける
+    unjudged: true,
   };
 }
 
@@ -194,6 +234,7 @@ async function runPanelCombined(input: string, hits: GlossaryEntry[]): Promise<C
       // モデルが原文にない span を返すことがあるので、原文に実在するものだけ通す
       triggers: r.triggers.filter((t) => t.span.length > 0 && input.includes(t.span)),
       rewrite: r.rewrite,
+      ...frictionFields(id, r.verdict, r),
     };
   });
 }
@@ -224,6 +265,7 @@ async function runPanelSplit(input: string, hits: GlossaryEntry[]): Promise<Cult
         reading: parsed.reading,
         triggers: parsed.triggers.filter((t) => t.span.length > 0 && input.includes(t.span)),
         rewrite: parsed.rewrite,
+        ...frictionFields(id, parsed.verdict, parsed),
       };
     }),
   );
@@ -248,11 +290,12 @@ async function runPanelSplit(input: string, hits: GlossaryEntry[]): Promise<Cult
  * （OpenRouterのmodelsフォールバック配列）を通しても万一全滅した場合のみ、
  * 4文化を個別リクエストに分割する縮退モードに落とす（層3）。
  */
-async function runPanel(input: string, hits: GlossaryEntry[]): Promise<CultureReading[]> {
+async function runPanel(input: string, hits: GlossaryEntry[], hooks?: AnalyzeHooks): Promise<CultureReading[]> {
   try {
     return await runPanelCombined(input, hits);
   } catch (err) {
     console.error("[panel] 統合判定が全滅したため、文化ごとに分割して再試行します", err);
+    notify(() => hooks?.onDegrade?.("panel_split"));
     return runPanelSplit(input, hits);
   }
 }
@@ -317,16 +360,59 @@ function overallOf(readings: CultureReading[]): Verdict {
   return readings.reduce<Verdict>((worst, r) => (RANK[r.verdict] > RANK[worst] ? r.verdict : worst), "green");
 }
 
-export async function analyze(input: string): Promise<CheckResult> {
+/**
+ * 1文化圏だけを読む。エージェントの自己検証で、修正案（添え書き付きの投稿・言い換え案）を
+ * 読み直すのに使う。判定の組み立ては統合判定・分割判定と同じ。
+ *
+ * task を分けているのは、検証を生成（panel）と別系統のモデルで行えるようにするため（models.ts の verify）。
+ * 同じモデルが自分の修正を採点すると甘くなりうる。
+ */
+export async function runPanelFor(
+  text: string,
+  hits: GlossaryEntry[],
+  culture: CultureId,
+  task: "panel" | "verify" = "verify",
+): Promise<CultureReading> {
+  const user = `次の投稿文を判定せよ。\n\n<投稿文>\n${sanitizeForPrompt(text)}\n</投稿文>`;
+  const parsed = await complete(task, panelSystem(hits, culture), user, SingleReadingSchema);
+  return {
+    culture,
+    verdict: parsed.verdict,
+    risk: Math.round(parsed.risk),
+    reading: parsed.reading,
+    triggers: parsed.triggers.filter((t) => t.span.length > 0 && text.includes(t.span)),
+    rewrite: parsed.rewrite,
+    ...frictionFields(culture, parsed.verdict, parsed),
+  };
+}
+
+export async function analyze(input: string, hooks?: AnalyzeHooks): Promise<CheckResult> {
   const started = Date.now();
   const hits = lookupGlossary(input);
+  notify(() => hooks?.onGlossary?.(hits));
+
+  // フックを渡されたときだけ、レーンの開始と終了を観測する。渡さなければ素通し。
+  const lane = <T>(name: "panel" | "gate", run: () => Promise<T>): Promise<T> => {
+    const t0 = Date.now();
+    notify(() => hooks?.onLane?.({ lane: name, phase: "start" }));
+    return run().then(
+      (v) => {
+        notify(() => hooks?.onLane?.({ lane: name, phase: "end", ok: true, ms: Date.now() - t0 }));
+        return v;
+      },
+      (e) => {
+        notify(() => hooks?.onLane?.({ lane: name, phase: "end", ok: false, ms: Date.now() - t0 }));
+        throw e;
+      },
+    );
+  };
 
   // ペルソナ判定と逆翻訳ゲートは互いに独立なので並列に走らせる。
   // ゲートだけ落ちた場合にペルソナ判定まで巻き添えで失うのは過剰なので、
   // allSettled で受けて部分的な結果を返せるようにしている。
   const [panelRes, gateRes] = await Promise.allSettled([
-    runPanel(input, hits),
-    runGate(input, hits),
+    lane("panel", () => runPanel(input, hits, hooks)),
+    lane("gate", () => runGate(input, hits)),
   ]);
 
   // ペルソナ判定が落ちた場合だけは返せるものが無いので、そのまま失敗させる

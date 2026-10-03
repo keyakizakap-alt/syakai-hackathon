@@ -33,10 +33,11 @@ function resolveExecutablePath() {
 
 const PORT = process.env.SHOT_PORT ?? "3900";
 const BASE = `http://localhost:${PORT}`;
-const OUT = "docs/screenshots";
+const OUT = process.env.SHOT_OUT ?? "docs/screenshots";
 
 /** 出国審査・入国審査それぞれのプリセット。デモモードで判定できるもの */
 const CHECK_PRESET = "新衣装かわいすぎて死んだ💀 しんどい……もう無理……";
+const HANDOFF_PRESET = "誕生日広告を渋谷駅に出します！ 一口500円でカンパ募集中です。DMください。";
 const FILTER_PRESET = "登場人物が閉じ込められる話が無理です。あと救いのない終わり方も避けたい。";
 
 function startServer() {
@@ -94,12 +95,39 @@ async function main() {
     await page.screenshot({ path: `${OUT}/01-top.png` });
     console.log("撮影: 01-top.png（初期画面）");
 
-    await runPreset(page, CHECK_PRESET, "text=検査結果");
+    const consoleBox = page.getByTestId("agent-console");
+    await consoleBox.screenshot({ path: `${OUT}/07-agent-idle.png` });
+    console.log("撮影: 07-agent-idle.png（エージェント：待機中。手順がそのまま製品の説明）");
+
+    // 実行中：デモ再生は手順の間に間隔があるので、②調査が走っている瞬間を撮れる
+    await page.getByRole("textbox").fill(CHECK_PRESET);
+    await page.getByRole("button", { name: /検める/ }).click();
+    await page.waitForSelector('[data-step="investigate"][data-status="running"]', { timeout: 10_000 });
+    await page.waitForTimeout(250);
+    await consoleBox.screenshot({ path: `${OUT}/08-agent-running.png` });
+    console.log("撮影: 08-agent-running.png（エージェント：実行中。並列2レーン）");
+
+    await page.waitForSelector('[data-testid="agent-console"][data-phase="done"]', { timeout: 30_000 });
+    await page.waitForTimeout(900);
+    await consoleBox.screenshot({ path: `${OUT}/09-agent-done.png` });
+    console.log("撮影: 09-agent-done.png（エージェント：完了。Before→After）");
+
+    // 要素撮影でページがスクロールしているので、全体の撮影前にトップへ戻す
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(200);
     await page.screenshot({ path: `${OUT}/02-check-result.png` });
     console.log("撮影: 02-check-result.png（出国審査の結果・レーダー）");
 
     await page.screenshot({ path: `${OUT}/03-check-full.png`, fullPage: true });
     console.log("撮影: 03-check-full.png（文化圏別カードまで全体）");
+
+    // 線引きのずれ：エージェントは自動で決めず、⑥で人の判断待ちとして止まる
+    await page.getByRole("textbox").fill(HANDOFF_PRESET);
+    await page.getByRole("button", { name: /検める/ }).click();
+    await page.waitForSelector('[data-testid="agent-console"][data-phase="done"]', { timeout: 30_000 });
+    await page.waitForTimeout(900);
+    await consoleBox.screenshot({ path: `${OUT}/10-agent-handoff.png` });
+    console.log("撮影: 10-agent-handoff.png（エージェント：線引きのずれ。人の判断待ちで停止）");
 
     await page.getByRole("tab", { name: /入国審査/ }).click();
     await page.waitForTimeout(400);
@@ -125,6 +153,13 @@ async function main() {
     await mpage.waitForTimeout(400);
     await mpage.screenshot({ path: `${OUT}/06-mobile.png` });
     console.log("撮影: 06-mobile.png（モバイル）");
+
+    await mpage.getByRole("textbox").fill(CHECK_PRESET);
+    await mpage.getByRole("button", { name: /検める/ }).click();
+    await mpage.waitForSelector('[data-testid="agent-console"][data-phase="done"]', { timeout: 30_000 });
+    await mpage.waitForTimeout(900);
+    await mpage.screenshot({ path: `${OUT}/11-mobile-result.png`, fullPage: true });
+    console.log("撮影: 11-mobile-result.png（モバイル：実行後の全体。結果→エージェントの順）");
     await mobile.close();
 
     await browser.close();
