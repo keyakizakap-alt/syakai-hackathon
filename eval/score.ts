@@ -102,6 +102,11 @@ export interface CheckScore {
   missedDivergence: [CultureId, CultureId][];
   /** 検出されるべきなのに trigger に現れなかった span */
   missedSpans: string[];
+  /**
+   * 根拠にした規範カードの番号の的中。any-of：期待した番号のどれか1つを挙げていれば的中。
+   * passed には含めない。既存の合格率と比べられる状態を保ち、「根拠の的中率」として独立に測るため。
+   */
+  citations: { culture: CultureId; expectedAny: number[]; cited: number[]; hit: boolean }[];
   passed: boolean;
 }
 
@@ -128,6 +133,16 @@ export function scoreCheckCase(c: CheckCase, result: CheckResult): CheckScore {
     ([a, b]) => verdictOf(a) === verdictOf(b),
   );
 
+  const citations: CheckScore["citations"] = Object.entries(c.expect.mustCiteNorm ?? {}).map(([culture, expectedAny]) => {
+    const cited = byCulture.get(culture as CultureId)?.normRefs ?? [];
+    return {
+      culture: culture as CultureId,
+      expectedAny: expectedAny ?? [],
+      cited,
+      hit: (expectedAny ?? []).some((n) => cited.includes(n)),
+    };
+  });
+
   const allSpans = result.cultures.flatMap((r) => r.triggers.map((t) => t.span));
   const missedSpans = (c.expect.mustFlagSpans ?? []).filter(
     (span) => !allSpans.some((s) => s.includes(span) || span.includes(s)),
@@ -140,6 +155,7 @@ export function scoreCheckCase(c: CheckCase, result: CheckResult): CheckScore {
     overWarned,
     missedDivergence,
     missedSpans,
+    citations,
     passed:
       underSeverity.length === 0 &&
       overWarned.length === 0 &&
@@ -156,6 +172,9 @@ export interface CheckAggregate {
   /** 対照群のうち過剰警告したケース数（偽陽性） */
   controlOverWarned: number;
   controlTotal: number;
+  /** 根拠の規範番号を期待していた（文化圏×ケース）の数と、的中した数 */
+  citeTotal: number;
+  citeHit: number;
 }
 
 export function aggregateCheck(scores: CheckScore[]): CheckAggregate {
@@ -163,8 +182,14 @@ export function aggregateCheck(scores: CheckScore[]): CheckAggregate {
   let passed = 0;
   let controlOverWarned = 0;
   let controlTotal = 0;
+  let citeTotal = 0;
+  let citeHit = 0;
 
   for (const s of scores) {
+    for (const cite of s.citations) {
+      citeTotal++;
+      if (cite.hit) citeHit++;
+    }
     byCategory[s.category] ??= { total: 0, passed: 0 };
     byCategory[s.category].total++;
     if (s.passed) {
@@ -177,7 +202,7 @@ export function aggregateCheck(scores: CheckScore[]): CheckAggregate {
     }
   }
 
-  return { total: scores.length, passed, byCategory, controlOverWarned, controlTotal };
+  return { total: scores.length, passed, byCategory, controlOverWarned, controlTotal, citeTotal, citeHit };
 }
 
 export function pct(n: number): string {
